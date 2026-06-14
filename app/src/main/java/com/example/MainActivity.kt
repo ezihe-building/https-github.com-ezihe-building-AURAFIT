@@ -76,8 +76,8 @@ class MainActivity : ComponentActivity() {
                                 NavigationBarItem(
                                     selected = activeTab == 1,
                                     onClick = { viewModel.activeDashboardTab.value = 1 },
-                                    icon = { Icon(Icons.Default.Explore, "Explore") },
-                                    label = { Text("Explore") },
+                                    icon = { Icon(Icons.Default.TrendingUp, "Stats") },
+                                    label = { Text("Stats") },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = ObsidianBlack,
                                         selectedTextColor = AuraNeonCyan,

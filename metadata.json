@@ -1,5 +1,5 @@
 {
-  "name": "Ulpifit",
+  "name": "AURAFIT",
   "description": "Premium fitness habit tracker, meal planner and personalized AI workout generator with custom metrics.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

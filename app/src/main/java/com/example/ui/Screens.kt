@@ -1,5 +1,7 @@
 package com.example.ui
 
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -31,8 +33,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import coil.compose.AsyncImage
-
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -83,6 +83,48 @@ fun AuraGradientBackground(
 }
 
 @Composable
+fun PulsingVoiceIndicator(isThinking: Boolean) {
+    val infiniteTransition = rememberInfiniteTransition(label = "voicePulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.3f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "voicePulseScale"
+    )
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "voicePulseAlpha"
+    )
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.size(60.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .background(if (isThinking) Color(0xFF8B5CF6).copy(alpha = alpha) else AuraNeonCyan.copy(alpha = alpha))
+        )
+        Icon(
+            imageVector = if (isThinking) Icons.Default.AutoAwesome else Icons.Default.GraphicEq,
+            contentDescription = null,
+            tint = ObsidianBlack,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
 fun AuraGlassCard(
     modifier: Modifier = Modifier,
     borderColor: Color = Color.White.copy(alpha = 0.08f),
@@ -110,6 +152,79 @@ fun AuraGlassCard(
             modifier = Modifier.padding(16.dp),
             content = content
         )
+    }
+}
+
+data class Badge(
+    val title: String, 
+    val description: String, 
+    val icon: androidx.compose.ui.graphics.vector.ImageVector, 
+    val isUnlocked: Boolean
+)
+
+@Composable
+fun BadgeItemView(badge: Badge) {
+    val haptic = LocalHapticFeedback.current
+    var visible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (badge.isUnlocked) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            kotlinx.coroutines.delay(100)
+        }
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = scaleIn(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+        modifier = Modifier.width(150.dp)
+    ) {
+        AuraGlassCard {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth().clickable {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+            ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(
+                        if (badge.isUnlocked) AuraNeonCyan.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f),
+                        CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = badge.icon, 
+                    contentDescription = badge.title,
+                    tint = if (badge.isUnlocked) AuraNeonCyan else Color.White.copy(alpha = 0.3f),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = badge.title,
+                color = if (badge.isUnlocked) Color.White else Color.White.copy(alpha = 0.5f),
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = badge.description,
+                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 10.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                lineHeight = 14.sp
+            )
+            if (!badge.isUnlocked) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+            }
+        }
+    }
     }
 }
 
@@ -254,7 +369,7 @@ fun SplashScreen(viewModel: AuraViewModel) {
                 }
 
                 // Interactive Navigation CTA
-                Button(
+                AuraButton(
                     onClick = {
                         if (slideIndex == 0) {
                             slideIndex = 1
@@ -354,10 +469,10 @@ fun AuthScreen(viewModel: AuraViewModel) {
                     Text(
                         text = when (mode) {
                             "register" -> "Sign up for free"
-                            "login" -> "Sign in to Ulpifit"
+                            "login" -> "Sign in to AURAFIT"
                             "forgot" -> "Reset password"
                             "verify_otp" -> "OTP Verification"
-                            else -> "Sign in to Ulpifit"
+                            else -> "Sign in to AURAFIT"
                         },
                         fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -460,7 +575,7 @@ fun AuthScreen(viewModel: AuraViewModel) {
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        Button(
+                        AuraButton(
                             onClick = {
                                 viewModel.onboardName.value = nameInput
                                 viewModel.triggerSignUp()
@@ -497,7 +612,7 @@ fun AuthScreen(viewModel: AuraViewModel) {
                     }
 
                     "login" -> {
-                        // Sign in to Ulpifit (Image 5)
+                        // Sign in to AURAFIT (Image 5)
                         OutlinedTextField(
                             value = email,
                             onValueChange = { viewModel.authEmailInput.value = it },
@@ -545,7 +660,7 @@ fun AuthScreen(viewModel: AuraViewModel) {
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        Button(
+                        AuraButton(
                             onClick = { viewModel.triggerLogIn() },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -606,7 +721,7 @@ fun AuthScreen(viewModel: AuraViewModel) {
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        Button(
+                        AuraButton(
                             onClick = { viewModel.triggerForgotPassword() },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -642,7 +757,7 @@ fun AuthScreen(viewModel: AuraViewModel) {
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    Button(
+                                    AuraButton(
                                         onClick = { viewModel.triggerResetPassword() },
                                         colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan),
                                         shape = RoundedCornerShape(8.dp),
@@ -695,7 +810,7 @@ fun AuthScreen(viewModel: AuraViewModel) {
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        Button(
+                        AuraButton(
                             onClick = { viewModel.verifyOtpAndCompleteSignUp() },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -723,7 +838,7 @@ fun AuthScreen(viewModel: AuraViewModel) {
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                Button(
+                AuraButton(
                     onClick = { viewModel.triggerGoogleSSO("sso.athlete@ulpifit.com") },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1004,7 +1119,7 @@ fun OnboardingScreen(viewModel: AuraViewModel) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 if (step > 1) {
-                    OutlinedButton(
+                    AuraOutlinedButton(
                         onClick = { step -= 1 },
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
@@ -1015,12 +1130,12 @@ fun OnboardingScreen(viewModel: AuraViewModel) {
                     }
                 }
 
-                Button(
+                AuraButton(
                     onClick = {
                         if (step < 6) {
                             if (step == 1 && name.trim().isEmpty()) {
                                 viewModel.onboardingError.value = "Please enter your display name."
-                                return@Button
+                                return@AuraButton
                             }
                             viewModel.onboardingError.value = null
                             step += 1
@@ -1066,7 +1181,7 @@ fun DashboardScreen(viewModel: AuraViewModel) {
     ) { targetTab ->
         when (targetTab) {
             0 -> TabHomeView(viewModel)
-            1 -> TabExploreView(viewModel)
+            1 -> TabStatsView(viewModel)
             2 -> TabProgramsView(viewModel)
             3 -> TabProfileView(viewModel)
             else -> TabHomeView(viewModel)
@@ -1112,7 +1227,7 @@ fun TabHomeView(viewModel: AuraViewModel) {
                     )
                 }
 
-                IconButton(
+                AuraIconButton(
                     onClick = { viewModel.currentRoute.value = "dashboard"; viewModel.activeDashboardTab.value = 1 }, // open AI Chat directly
                     modifier = Modifier
                         .background(Color.White.copy(alpha = 0.05f), CircleShape)
@@ -1158,10 +1273,12 @@ fun TabHomeView(viewModel: AuraViewModel) {
                     val isChosen = selectedCategory == name
                     Row(
                         modifier = Modifier
+                            .animateItem()
                             .clip(RoundedCornerShape(12.dp))
                             .background(if (isChosen) AuraNeonCyan else Color.White.copy(alpha = 0.04f))
                             .clickable { selectedCategory = name }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                            .animateContentSize(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(icon, null, tint = if (isChosen) ObsidianBlack else Color.White, modifier = Modifier.size(16.dp))
@@ -1245,7 +1362,7 @@ fun TabHomeView(viewModel: AuraViewModel) {
                         Text("Strength Training • 45 min • 350 Kcal", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                     }
 
-                    Button(
+                    AuraButton(
                         onClick = {
                             // Find and trigger gym routine preset
                             val drills = WorkoutPreset.exercises.filter { it.category == "Strength" }.take(6)
@@ -1287,6 +1404,7 @@ fun TabHomeView(viewModel: AuraViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TabExploreView(viewModel: AuraViewModel) {
+    /*
     var searchChatStr by remember { mutableStateOf("") }
     var selectedMiniTab by remember { mutableStateOf("AI") } // AI, Archived, Deleted
     var activeChatByTitle by remember { mutableStateOf<String?>(null) } // if not null, show Chat thread screen!
@@ -1294,6 +1412,7 @@ fun TabExploreView(viewModel: AuraViewModel) {
     val chatsMessagesFlow by viewModel.chatMessages.collectAsStateWithLifecycle()
     val isAiLoading by viewModel.isAiLoading.collectAsStateWithLifecycle()
     val isAiDemoMode by viewModel.isAiDemoMode.collectAsStateWithLifecycle()
+    val isThinkingMode by viewModel.isThinkingMode.collectAsStateWithLifecycle()
 
     var chatMessageInput by remember { mutableStateOf("") }
 
@@ -1312,13 +1431,26 @@ fun TabExploreView(viewModel: AuraViewModel) {
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { activeChatByTitle = null }) {
+                    AuraIconButton(onClick = { activeChatByTitle = null }) {
                         Icon(Icons.Default.ArrowBack, null, tint = Color.White)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text(activeChatByTitle ?: "Uplift AI Coach", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(activeChatByTitle ?: "AURAFIT AI Coach", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Text("Active Fitness assistant", color = AuraNeonCyan, fontSize = 11.sp)
+                    }
+                    
+                    // Thinking Mode Toggle
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("DEEP THINK", color = if (isThinkingMode) AuraNeonCyan else Color.White.copy(alpha=0.5f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Switch(
+                            checked = isThinkingMode,
+                            onCheckedChange = { viewModel.toggleThinkingMode(it) },
+                            colors = SwitchDefaults.colors(checkedThumbColor = ObsidianBlack, checkedTrackColor = AuraNeonCyan)
+                        )
                     }
                 }
 
@@ -1331,9 +1463,9 @@ fun TabExploreView(viewModel: AuraViewModel) {
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(chatsMessagesFlow) { (sender, text) ->
-                        val isAI = sender == "Ulpifit Assistant"
+                        val isAI = sender == "AURAFIT Assistant"
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().animateContentSize(),
                             horizontalArrangement = if (isAI) Arrangement.Start else Arrangement.End
                         ) {
                             Box(
@@ -1360,13 +1492,16 @@ fun TabExploreView(viewModel: AuraViewModel) {
                             }
                         }
                     }
-
+                    
                     if (isAiLoading) {
                         item {
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(8.dp),
-                                horizontalArrangement = Arrangement.Start
+                                modifier = Modifier.fillMaxWidth().padding(8.dp).animateItem(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                PulsingVoiceIndicator(isThinking = isThinkingMode)
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(14.dp))
@@ -1374,8 +1509,8 @@ fun TabExploreView(viewModel: AuraViewModel) {
                                         .padding(12.dp)
                                 ) {
                                     Text(
-                                        text = "Uplift is analyzing...",
-                                        color = Color.White.copy(alpha = 0.5f),
+                                        text = if (isThinkingMode) "AURAFIT is thinking deeply..." else "AURAFIT is speaking...",
+                                        color = AuraNeonCyan.copy(alpha = 0.8f),
                                         fontSize = 13.sp,
                                         style = androidx.compose.ui.text.TextStyle(
                                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
@@ -1386,8 +1521,8 @@ fun TabExploreView(viewModel: AuraViewModel) {
                         }
                     }
                 }
-
-                if (isAiDemoMode) {
+                
+                AnimatedVisibility(visible = isAiDemoMode) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1398,7 +1533,7 @@ fun TabExploreView(viewModel: AuraViewModel) {
                             .padding(10.dp)
                     ) {
                         Text(
-                            text = "⚠️ Demo Mode Active: Showing custom offline sports responses. For unlimited live Gemini AI, set your GEMINI_API_KEY inside workspace secrets.",
+                            text = "⚠️ Voice Demo Active: Showing offline responses. For live Gemini voice integration, populate GEMINI_API_KEY in secrets.",
                             color = AuraAccentCoral,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
@@ -1417,10 +1552,16 @@ fun TabExploreView(viewModel: AuraViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    AuraIconButton(
+                        onClick = { viewModel.speakText("Recording initialized. Say your command") },
+                        modifier = Modifier.background(Color(0xFF131A2B), CircleShape)
+                    ) {
+                        Icon(Icons.Default.Mic, null, tint = AuraNeonCyan)
+                    }
                     OutlinedTextField(
                         value = chatMessageInput,
                         onValueChange = { chatMessageInput = it },
-                        placeholder = { Text("Ask anything about workouts...", color = Color.White.copy(alpha = 0.3f)) },
+                        placeholder = { Text("Ask or press mic...", color = Color.White.copy(alpha = 0.3f)) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -1429,7 +1570,7 @@ fun TabExploreView(viewModel: AuraViewModel) {
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(24.dp)
                     )
-                    IconButton(
+                    AuraIconButton(
                         onClick = {
                             if (chatMessageInput.trim().isNotEmpty()) {
                                 val query = chatMessageInput
@@ -1518,7 +1659,7 @@ fun TabExploreView(viewModel: AuraViewModel) {
                 ) {
                     items(queriesList) { (title, subtitle) ->
                         AuraGlassCard(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().animateItem(),
                             onClick = { 
                                 activeChatByTitle = title 
                                 viewModel.selectActiveChat(title)
@@ -1547,6 +1688,194 @@ fun TabExploreView(viewModel: AuraViewModel) {
                 }
                 
                 Spacer(modifier = Modifier.height(100.dp))
+            }
+        }
+    }
+    */
+}
+
+// === TAB 1 : STATS & PROGRESS ===
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TabStatsView(viewModel: AuraViewModel) {
+    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
+    val scrollState = rememberScrollState()
+    var selectedMetric by remember { mutableStateOf("Volume") }
+
+    val metrics = listOf("Volume", "Weight", "Calories", "Active Time")
+
+    AuraGradientBackground {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+                .safeDrawingPadding()
+                .verticalScroll(scrollState)
+        ) {
+            Spacer(modifier = Modifier.height(14.dp))
+            
+            Text("YOUR PERFORMANCE", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Text("Workout Stats", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Chips for metrics
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                metrics.forEach { metric ->
+                    val isSelected = selectedMetric == metric
+                    Box(
+                        modifier = Modifier
+                            .background(if (isSelected) AuraNeonCyan else Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                            .clickable { selectedMetric = metric }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = metric,
+                            color = if (isSelected) Color.Black else Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            AnimatedContent(
+                targetState = selectedMetric,
+                modifier = Modifier.fillMaxWidth(),
+                transitionSpec = {
+                    (slideInHorizontally(animationSpec = tween(300)) { width -> width / 2 } + fadeIn(animationSpec = tween(300)))
+                        .togetherWith(slideOutHorizontally(animationSpec = tween(300)) { width -> -width / 2 } + fadeOut(animationSpec = tween(300)))
+                },
+                label = "stats_chart_animation"
+            ) { targetMetric ->
+                when (targetMetric) {
+                    "Volume" -> StatsLineChart("Workout Volume", listOf(45f, 50f, 48f, 60f, 65f, 58f, 70f, 85f, 80f, 95f), Modifier.fillMaxWidth())
+                    "Weight" -> StatsLineChart("Body Weight (lbs)", listOf(185f, 184f, 184.5f, 183f, 182f, 181.5f, 180f, 179f, 179.5f, 178f), Modifier.fillMaxWidth())
+                    "Calories" -> StatsLineChart("Calories Burned", listOf(300f, 350f, 320f, 400f, 450f, 420f, 500f, 600f, 550f, 700f), Modifier.fillMaxWidth())
+                    "Active Time" -> StatsLineChart("Active Time (mins)", listOf(30f, 40f, 35f, 50f, 60f, 45f, 70f, 90f, 85f, 100f), Modifier.fillMaxWidth())
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            AuraGlassCard {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.TrendingUp, null, tint = AuraNeonCyan)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Total Workouts", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                    }
+                    Text("14", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("+2 from last week", color = AuraNeonCyan, fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            AuraGlassCard {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.LocalFireDepartment, null, tint = AuraNeonCyan)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Total Calories Burned", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                    }
+                    Text("4,200 kcal", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+
+            AuraGlassCard {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Timer, null, tint = AuraNeonCyan)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Total Time Active", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                    }
+                    Text("12h 45m", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(100.dp))
+        }
+    }
+}
+
+@Composable
+fun StatsLineChart(title: String, dataPoints: List<Float>, modifier: Modifier = Modifier) {
+    val neonOrange = Color(0xFFFF6D00)
+    
+    AuraGlassCard(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Canvas(modifier = Modifier.fillMaxWidth().height(180.dp)) {
+                val maxPoint = dataPoints.maxOrNull() ?: 100f
+                val minPoint = dataPoints.minOrNull() ?: 0f
+                val range = (maxPoint - minPoint).takeIf { it > 0 } ?: 1f
+                
+                val width = size.width
+                val height = size.height
+                
+                val stepX = width / (dataPoints.size - 1)
+                
+                val path = androidx.compose.ui.graphics.Path()
+                dataPoints.forEachIndexed { index, value ->
+                    val x = index * stepX
+                    // Flip Y axis: larger values are drawn higher up
+                    val y = height - ((value - minPoint) / range * height * 0.8f) - (height * 0.1f)
+                    
+                    if (index == 0) {
+                        path.moveTo(x, y)
+                    } else {
+                        val prevX = (index - 1) * stepX
+                        val prevY = height - ((dataPoints[index - 1] - minPoint) / range * height * 0.8f) - (height * 0.1f)
+                        
+                        val controlPointX1 = prevX + (x - prevX) / 2
+                        val controlPointX2 = prevX + (x - prevX) / 2
+                        
+                        path.cubicTo(controlPointX1, prevY, controlPointX2, y, x, y)
+                    }
+                }
+                
+                // Draw graph path
+                drawPath(
+                    path = path,
+                    color = neonOrange,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                )
+
+                dataPoints.forEachIndexed { index, value ->
+                    val x = index * stepX
+                    val y = height - ((value - minPoint) / range * height * 0.8f) - (height * 0.1f)
+                    // Draw point
+                    drawCircle(
+                        color = Color.White,
+                        radius = 4.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(x, y)
+                    )
+                }
+                
+                // Draw bottom axis
+                drawLine(
+                    color = Color.White.copy(alpha = 0.2f),
+                    start = androidx.compose.ui.geometry.Offset(0f, height),
+                    end = androidx.compose.ui.geometry.Offset(width, height),
+                    strokeWidth = 1.dp.toPx()
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Last Month", color = Color.White.copy(alpha=0.5f), fontSize = 12.sp)
+                Text("Today", color = neonOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -1592,7 +1921,7 @@ fun TabProgramsView(viewModel: AuraViewModel) {
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            IconButton(onClick = { selectedPlanToView = null }) {
+                            AuraIconButton(onClick = { selectedPlanToView = null }) {
                                 Icon(Icons.Default.ArrowBack, null, tint = Color.White, modifier = Modifier.size(36.dp))
                             }
                             Text("Back Workout Plan", color = Color.White, fontWeight = FontWeight.Black, fontSize = 28.sp)
@@ -1638,10 +1967,8 @@ fun TabProgramsView(viewModel: AuraViewModel) {
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // Drill list matching Image 22 list item styling with expandability
-                        var expandedDrillIndex by remember { mutableStateOf<Int?>(null) }
-
-                        Text("TRAINING DRILLS (Tap to view visual guides)", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                        // Drill list matching Image 22 list item styling
+                        Text("TRAINING DRILLS", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
                         Spacer(modifier = Modifier.height(10.dp))
 
                         val drills = listOf(
@@ -1653,87 +1980,33 @@ fun TabProgramsView(viewModel: AuraViewModel) {
                         )
 
                         drills.forEachIndexed { i, (name, reps) ->
-                            Column(
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { expandedDrillIndex = if (expandedDrillIndex == i) null else i }
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .size(24.dp)
+                                        .background(AuraNeonCyan.copy(alpha = 0.15f), CircleShape),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(24.dp)
-                                            .background(AuraNeonCyan.copy(alpha = 0.15f), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text("${i + 1}", color = AuraNeonCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Text(reps, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
-                                    }
-                                    Icon(
-                                        imageVector = if (expandedDrillIndex == i) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Expand drill visualizer details",
-                                        tint = AuraNeonCyan,
-                                        modifier = Modifier.size(20.dp)
-                                    )
+                                    Text("${i + 1}", color = AuraNeonCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                 }
-
-                                AnimatedVisibility(
-                                    visible = expandedDrillIndex == i,
-                                    enter = expandVertically() + fadeIn(),
-                                    exit = shrinkVertically() + fadeOut()
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(bottom = 12.dp)
-                                            .height(115.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        // Left: Dynamic coaching joint skeleton animation
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .background(Color.White.copy(alpha = 0.03f))
-                                        ) {
-                                            ExerciseVisualizer(
-                                                exerciseName = name,
-                                                modifier = Modifier.fillMaxSize()
-                                            )
-                                        }
-
-                                        // Right: Photographic demonstration of the same movement
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(12.dp))
-                                        ) {
-                                            AsyncImage(
-                                                model = getExerciseDemonstrationUrl(name, "Strength"),
-                                                contentDescription = "Photo demonstration wrapper",
-                                                modifier = Modifier.fillMaxSize(),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        }
-                                    }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(reps, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
                                 }
+                                Icon(Icons.Default.CheckCircle, null, tint = AuraNeonCyan, modifier = Modifier.size(18.dp))
                             }
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
 
                         // Launch layout CTA
-                        Button(
+                        AuraButton(
                             onClick = {
                                 selectedPlanToView = null
                                 val exercises = WorkoutPreset.exercises.filter { it.category == "Strength" }.take(5)
@@ -1784,7 +2057,7 @@ fun TabProgramsView(viewModel: AuraViewModel) {
                             
                             Spacer(modifier = Modifier.height(14.dp))
                             
-                            Button(
+                            AuraButton(
                                 onClick = { selectedPlanToView = "Back Workout" },
                                 colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
                                 shape = RoundedCornerShape(8.dp)
@@ -1842,7 +2115,7 @@ fun TabProgramsView(viewModel: AuraViewModel) {
                                     Text(metrics, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
                                 }
 
-                                IconButton(onClick = { selectedPlanToView = planName }) {
+                                AuraIconButton(onClick = { selectedPlanToView = planName }) {
                                     Icon(Icons.Default.ArrowForwardIos, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(12.dp))
                                 }
                             }
@@ -1907,8 +2180,8 @@ fun TabProfileView(viewModel: AuraViewModel) {
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // 1. Uplift Score Radar/Doughnut Card (Image 13 visual recreation)
-            Text("UPLIFT SPORT PERFORMANCE ASSESSMENT", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            // 1. AURAFIT Score Radar/Doughnut Card (Image 13 visual recreation)
+            Text("AURAFIT SPORT PERFORMANCE ASSESSMENT", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             Spacer(modifier = Modifier.height(10.dp))
             AuraGlassCard {
                 Row(
@@ -1945,7 +2218,7 @@ fun TabProfileView(viewModel: AuraViewModel) {
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("84", fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White)
-                            Text("Uplift", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                            Text("AURAFIT", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
                         }
                     }
 
@@ -1971,6 +2244,29 @@ fun TabProfileView(viewModel: AuraViewModel) {
                 }
                 Spacer(modifier = Modifier.height(10.dp))
                 Text("Your fitness score indicates high cardiorespiratory and muscle fiber compliance.", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text("ACHIEVEMENTS & MILESTONES", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val sampleBadges = listOf(
+                Badge("First Steps", "Complete your first workout", Icons.Default.DirectionsRun, true),
+                Badge("Week Warrior", "Hit a 7-day workout streak", Icons.Default.LocalFireDepartment, true),
+                Badge("Iron Lifter", "Lift over 1000 lbs in total", Icons.Default.FitnessCenter, false),
+                Badge("Century Club", "Complete 100 workouts", Icons.Default.EmojiEvents, false)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                sampleBadges.forEach { badge ->
+                    BadgeItemView(badge)
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -2061,7 +2357,7 @@ fun TabProfileView(viewModel: AuraViewModel) {
                         shape = RoundedCornerShape(10.dp)
                     )
 
-                    Button(
+                    AuraButton(
                         onClick = {
                             val v = loggedCalorieInput.toIntOrNull()
                             if (v != null) {
@@ -2132,14 +2428,14 @@ fun TabProfileView(viewModel: AuraViewModel) {
 
                         // Quick water adder rows
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
+                            AuraButton(
                                 onClick = { currentHydrationMl = (currentHydrationMl + 250).coerceAtMost(2000) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("+250ml", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
-                            Button(
+                            AuraButton(
                                 onClick = { currentHydrationMl = (currentHydrationMl + 500).coerceAtMost(2000) },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
                                 shape = RoundedCornerShape(8.dp)
@@ -2181,7 +2477,7 @@ fun TabProfileView(viewModel: AuraViewModel) {
                 Divider(color = Color.White.copy(alpha = 0.04f), modifier = Modifier.padding(vertical = 12.dp))
 
                 // Custom logout bypass
-                OutlinedButton(
+                AuraOutlinedButton(
                     onClick = { viewModel.triggerLogout() },
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = AuraAccentCoral),
                     border = BorderStroke(1.dp, AuraAccentCoral.copy(alpha = 0.5f)),
@@ -2288,58 +2584,19 @@ fun WorkoutTimerScreen(viewModel: AuraViewModel) {
                 }
             }
 
-            // Dynamic Skeletal Joint + demonstration picture Split Row
-            Row(
+            // Dynamic Skeletal Joint visualization
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(115.dp)
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(vertical = 4.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = 0.2f))
             ) {
-                // Left: Dynamic coaching joint skeleton animation
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.2f))
-                ) {
-                    ExerciseVisualizer(
-                        exerciseName = currentDrill?.name ?: "Workout",
-                        modifier = Modifier.fillMaxSize(),
-                        isResting = isResting
-                    )
-                }
-
-                // Right: Premium actual athlete photo demonstration
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(RoundedCornerShape(16.dp))
-                ) {
-                    AsyncImage(
-                        model = getExerciseDemonstrationUrl(currentDrill?.name ?: "", currentDrill?.category ?: "Strength"),
-                        contentDescription = "Physical Exercise Demo Image",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(6.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "PHOTO GUIDE",
-                            color = AuraNeonCyan,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                ExerciseVisualizer(
+                    exerciseName = currentDrill?.name ?: "Workout",
+                    modifier = Modifier.fillMaxWidth().height(240.dp),
+                    isResting = isResting
+                )
             }
 
             // Realtime accumulator specs card
@@ -2369,7 +2626,7 @@ fun WorkoutTimerScreen(viewModel: AuraViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Premature exit button
-                OutlinedButton(
+                AuraOutlinedButton(
                     onClick = { viewModel.exitActiveWorkoutPrematurely() },
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                     shape = RoundedCornerShape(12.dp),
@@ -2380,7 +2637,7 @@ fun WorkoutTimerScreen(viewModel: AuraViewModel) {
                 }
 
                 // Pause active control
-                Button(
+                AuraButton(
                     onClick = { viewModel.pauseResumeWorkoutTimer() },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isPaused) AuraNeonCyan else Color.White,
@@ -2396,7 +2653,7 @@ fun WorkoutTimerScreen(viewModel: AuraViewModel) {
                 }
 
                 // Skip drill control
-                IconButton(
+                AuraIconButton(
                     onClick = { viewModel.skipCurrentExercise() },
                     modifier = Modifier
                         .size(50.dp)
@@ -2410,27 +2667,91 @@ fun WorkoutTimerScreen(viewModel: AuraViewModel) {
     }
 }
 
-fun getExerciseDemonstrationUrl(name: String, category: String): String {
-    val clean = name.lowercase(java.util.Locale.US)
-    return when {
-        clean.contains("squat") -> 
-            "https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=500&auto=format&fit=crop"
-        clean.contains("push-up") || clean.contains("plank") -> 
-            "https://images.unsplash.com/photo-1598971639058-fab3c3109a00?q=80&w=500&auto=format&fit=crop"
-        clean.contains("deadlift") -> 
-            "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=500&auto=format&fit=crop"
-        clean.contains("pull") || clean.contains("row") -> 
-            "https://images.unsplash.com/photo-1605296867304-46d5465a25f1?q=80&w=500&auto=format&fit=crop"
-        clean.contains("press") -> 
-            "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=300&auto=format&fit=crop"
-        clean.contains("stretch") || clean.contains("pose") -> 
-            "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=500&auto=format&fit=crop"
-        category.equals("Cardio", ignoreCase = true) -> 
-            "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=500&auto=format&fit=crop"
-        category.equals("Stretching", ignoreCase = true) -> 
-            "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=500&auto=format&fit=crop"
-        else -> 
-            "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=500&auto=format&fit=crop"
-    }
+// ==========================================
+// HAPTIC BUTTON WRAPPERS
+// ==========================================
+
+@Composable
+fun AuraButton(
+    onClick: () -> Unit,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    enabled: Boolean = true,
+    shape: androidx.compose.ui.graphics.Shape = ButtonDefaults.shape,
+    colors: ButtonColors = ButtonDefaults.buttonColors(),
+    elevation: ButtonElevation? = ButtonDefaults.buttonElevation(),
+    border: androidx.compose.foundation.BorderStroke? = null,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding,
+    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    Button(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
+        modifier = modifier,
+        enabled = enabled,
+        shape = shape,
+        colors = colors,
+        elevation = elevation,
+        border = border,
+        contentPadding = contentPadding,
+        interactionSource = interactionSource,
+        content = content
+    )
 }
 
+@Composable
+fun AuraOutlinedButton(
+    onClick: () -> Unit,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    enabled: Boolean = true,
+    shape: androidx.compose.ui.graphics.Shape = ButtonDefaults.outlinedShape,
+    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
+    elevation: ButtonElevation? = null,
+    border: androidx.compose.foundation.BorderStroke? = ButtonDefaults.outlinedButtonBorder,
+    contentPadding: androidx.compose.foundation.layout.PaddingValues = ButtonDefaults.ContentPadding,
+    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+    content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    OutlinedButton(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
+        modifier = modifier,
+        enabled = enabled,
+        shape = shape,
+        colors = colors,
+        elevation = elevation,
+        border = border,
+        contentPadding = contentPadding,
+        interactionSource = interactionSource,
+        content = content
+    )
+}
+
+@Composable
+fun AuraIconButton(
+    onClick: () -> Unit,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    enabled: Boolean = true,
+    colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
+    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+    content: @Composable () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    IconButton(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
+        modifier = modifier,
+        enabled = enabled,
+        colors = colors,
+        interactionSource = interactionSource,
+        content = content
+    )
+}
