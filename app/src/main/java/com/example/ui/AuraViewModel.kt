@@ -2,21 +2,154 @@ package com.example.ui
 
 import android.app.Application
 import android.util.Log
+import android.media.AudioManager
+import android.media.ToneGenerator
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import org.json.JSONArray
+import java.util.Locale
+import com.example.BuildConfig
 
 class AuraViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = AuraRepository(application)
 
     // ==========================================
+    // NOTIFICATION SOUND PROTOCOL (CHIME METRONOME)
+    // ==========================================
+    private fun playSoundNotification(tone: Int, duration: Int = 120) {
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 85)
+                toneGen.startTone(tone, duration)
+                delay(duration.toLong() + 50)
+                toneGen.release()
+            } catch (e: Exception) {
+                Log.w("AuraViewModel", "ToneGenerator play failure", e)
+            }
+        }
+    }
+
+    // ==========================================
+    // CUSTOM WORKOUT ROUTINE CREATION PROTOCOL
+    // ==========================================
+    val customWorkoutRoutines = MutableStateFlow<List<Pair<String, List<Exercise>>>>(emptyList())
+
+    fun loadCustomRoutines() {
+        val email = activeEmail.value ?: return
+        try {
+            val prefs = getApplication<Application>().getSharedPreferences("aurafit_shared_prefs", android.content.Context.MODE_PRIVATE)
+            val dataStr = prefs.getString("custom_routines_$email", "") ?: ""
+            if (dataStr.isEmpty()) {
+                customWorkoutRoutines.value = emptyList()
+                return
+            }
+            
+            val routines = mutableListOf<Pair<String, List<Exercise>>>()
+            val entries = dataStr.split(";")
+            for (entry in entries) {
+                if (entry.isEmpty()) continue
+                val parts = entry.split(":")
+                if (parts.size >= 2) {
+                    val name = parts[0]
+                    val ids = parts[1].split(",")
+                    val exercises = ids.mapNotNull { id ->
+                        WorkoutPreset.exercises.find { it.id == id }
+                    }
+                    if (exercises.isNotEmpty()) {
+                        routines.add(name to exercises)
+                    }
+                }
+            }
+            customWorkoutRoutines.value = routines
+        } catch (e: Exception) {
+            Log.e("AuraViewModel", "Failed to load custom routines", e)
+        }
+    }
+
+    fun saveCustomRoutine(name: String, exerciseIds: List<String>) {
+        val email = activeEmail.value ?: return
+        if (name.isEmpty() || exerciseIds.isEmpty()) return
+        
+        try {
+            val prefs = getApplication<Application>().getSharedPreferences("aurafit_shared_prefs", android.content.Context.MODE_PRIVATE)
+            val currentData = prefs.getString("custom_routines_$email", "") ?: ""
+            
+            val cleanName = name.replace(":", "").replace(";", "")
+            val idsStr = exerciseIds.joinToString(",")
+            val newEntry = "$cleanName:$idsStr"
+            
+            val updatedData = if (currentData.isEmpty()) newEntry else "$currentData;$newEntry"
+            prefs.edit().putString("custom_routines_$email", updatedData).apply()
+            
+            loadCustomRoutines()
+            
+            // Trigger confirmation notification log
+            viewModelScope.launch {
+                repository.triggerCustomNotification(
+                    email = email,
+                    title = "New Blueprint Configured!",
+                    message = "Successfully created your personalized training program: $cleanName (${exerciseIds.size} drills).",
+                    type = "motivation"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("AuraViewModel", "Failed to save custom routine", e)
+        }
+    }
+
+    fun deleteCustomRoutine(nameToDelete: String) {
+        val email = activeEmail.value ?: return
+        try {
+            val prefs = getApplication<Application>().getSharedPreferences("aurafit_shared_prefs", android.content.Context.MODE_PRIVATE)
+            val currentData = prefs.getString("custom_routines_$email", "") ?: ""
+            if (currentData.isEmpty()) return
+            
+            val entries = currentData.split(";")
+            val filteredEntries = entries.filter { entry ->
+                val name = entry.substringBefore(":")
+                name != nameToDelete
+            }
+            
+            val updatedData = filteredEntries.joinToString(";")
+            prefs.edit().putString("custom_routines_$email", updatedData).apply()
+            
+            loadCustomRoutines()
+        } catch (e: Exception) {
+            Log.e("AuraViewModel", "Failed to delete custom routine", e)
+        }
+    }
+
+    fun jumpToExercise(index: Int) {
+        val list = activeExercisesList.value
+        if (index in list.indices) {
+            currentExerciseIndex.value = index
+            timerSecondsLeft.value = list[index].durationSeconds
+            isRestingState.value = false
+            restSecondsLeft.value = 0
+            isTimerPaused.value = false
+            
+            // Sound feedback for navigation
+            playSoundNotification(ToneGenerator.TONE_PROP_BEEP, 120)
+        }
+    }
+
+    // ==========================================
     // NAVIGATION & SHELL STATES
     // ==========================================
     val currentRoute = MutableStateFlow<String>("splash") // splash, auth, onboarding, dashboard, timer, settings, history, notifications
+    val activeDashboardTab = MutableStateFlow(0)
 
     // ==========================================
     // AUTHENTICATION STATES
@@ -116,6 +249,15 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
     // INITIALIZATION & SESSION BINDING
     // ==========================================
     init {
+        // Observe reactive user email to load user-scoped custom routines
+        viewModelScope.launch {
+            activeEmail.collect { email ->
+                if (email != null) {
+                    loadCustomRoutines()
+                }
+            }
+        }
+
         // Evaluate active login session on startup using deterministic suspended queries
         viewModelScope.launch {
             try {
@@ -481,6 +623,12 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
                     if (isRestingState.value) {
                         // We are in rest transition countdown
                         val currentRest = restSecondsLeft.value
+                        
+                        // Metronome warn bells
+                        if (currentRest in 1..3) {
+                            playSoundNotification(ToneGenerator.TONE_CDMA_PIP, 80)
+                        }
+
                         if (currentRest > 1) {
                             restSecondsLeft.value = currentRest - 1
                         } else {
@@ -489,6 +637,9 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
                             val exerciseIndex = currentExerciseIndex.value
                             val currentExercise = activeExercisesList.value.getOrNull(exerciseIndex)
                             timerSecondsLeft.value = currentExercise?.durationSeconds ?: 45
+                            
+                            // Go sound indicator!
+                            playSoundNotification(ToneGenerator.TONE_PROP_ACK, 250)
                         }
                     } else {
                         // Active exercise execution
@@ -503,6 +654,11 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
                             liveEstimatedCaloriesBurned.value += calPerSec
                         }
 
+                        // Metronome beep ticks (for final 3 seconds of set)
+                        if (activeLeft in 1..3) {
+                            playSoundNotification(ToneGenerator.TONE_CDMA_PIP, 80)
+                        }
+
                         if (activeLeft > 1) {
                             timerSecondsLeft.value = activeLeft - 1
                         } else {
@@ -512,8 +668,12 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
                                 isRestingState.value = true
                                 restSecondsLeft.value = 15 // 15 seconds rest
                                 currentExerciseIndex.value = exerciseIndex + 1
+                                
+                                // Rest transition tone!
+                                playSoundNotification(ToneGenerator.TONE_PROP_ACK, 250)
                             } else {
-                                // Workout fully completed!
+                                // Workout fully completed! Play triumphant end chords
+                                playSoundNotification(ToneGenerator.TONE_PROP_ACK, 400)
                                 isWorkoutActive.value = false
                                 finalizeWorkoutSaving()
                             }
@@ -643,11 +803,13 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun updateOnboardStatsDirectly(name: String, heightStr: String, weightStr: String) {
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) return
         viewModelScope.launch {
             val email = activeEmail.value ?: return@launch
             val h = heightStr.toFloatOrNull() ?: 175f
             val w = weightStr.toFloatOrNull() ?: 70f
-            repository.updateProfile(email, name, h, w)
+            repository.updateProfile(email, cleanName, h, w)
             
             // Toast / confirm alert via welcome back log
             repository.triggerCustomNotification(
@@ -661,5 +823,186 @@ class AuraViewModel(application: Application) : AndroidViewModel(application) {
 
     fun getTodayString(): String {
         return repository.getTodayString()
+    }
+
+    // ==========================================
+    // AI CHAT COACH (GEMINI API) ENGINE
+    // ==========================================
+    val isAiLoading = MutableStateFlow(false)
+    val isAiDemoMode = MutableStateFlow(false)
+    val chatMessages = MutableStateFlow<List<Pair<String, String>>>(listOf(
+        "Ulpifit Assistant" to "Hi I am Uplift, Your AI Personal Training and Sports Assistant. Just ask me anything about hypertrophy, fat loss, or calorie management!"
+    ))
+
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    fun selectActiveChat(title: String) {
+        val initialAssistantMessage = when {
+            title.contains("bulk", ignoreCase = true) -> 
+                "Hi! Let's optimize your bulk program. Are you looking to do a clean bulk or a general surplus build? List any weight/height targets."
+            title.contains("Score", ignoreCase = true) -> 
+                "Greetings! Here on the Fitness Score board, let's talk about tracking your metabolic compliance. Ask me anything on how to increase your score."
+            title.contains("water", ignoreCase = true) -> 
+                "Uplift Hydration helper here! Let's plan your daily water intake. Tell me your average cup size or current daily water amount."
+            title.contains("muscle", ignoreCase = true) -> 
+                "Gain muscle protocols initiated! To design a high-hypertrophy structure, tell me what equipment (gym/barbell or home/bodyweight) is available to you."
+            title.contains("Nutrition", ignoreCase = true) -> 
+                "Nutrition upgrade protocol ready. Let's design a daily meal structure of whole foods. What are your primary dietary restrictions or calorie goals?"
+            title.contains("Fitness data", ignoreCase = true) -> 
+                "Your fitness data is logged. Let's analyze your completed workouts or dynamic streaks to push you even harder!"
+            else -> 
+                "Hi! I am Uplift, Your AI Personal Training and Sports Assistant. Just ask me anything about hypertrophy, fat loss, or calorie management!"
+        }
+        
+        chatMessages.value = listOf("Ulpifit Assistant" to initialAssistantMessage)
+        isAiDemoMode.value = false
+    }
+
+    fun sendChatMessage(messageText: String) {
+        val trimmed = messageText.trim()
+        if (trimmed.isEmpty()) return
+
+        val currentList = chatMessages.value.toMutableList()
+        currentList.add("User" to trimmed)
+        chatMessages.value = currentList
+
+        isAiLoading.value = true
+
+        viewModelScope.launch {
+            try {
+                val apiKey = BuildConfig.GEMINI_API_KEY
+                val responseText = if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+                    isAiDemoMode.value = true
+                    getLocalAiDemoResponse(trimmed)
+                } else {
+                    isAiDemoMode.value = false
+                    queryGeminiAPI(currentList.dropLast(1), trimmed)
+                }
+                
+                val updatedList = chatMessages.value.toMutableList()
+                updatedList.add("Ulpifit Assistant" to responseText)
+                chatMessages.value = updatedList
+            } catch (e: Exception) {
+                Log.e("AuraViewModel", "Failed to send chat message", e)
+                val updatedList = chatMessages.value.toMutableList()
+                updatedList.add("Ulpifit Assistant" to "I encountered an error connecting to the AI helper. Please make sure your internet connection or key configuration is active.")
+                chatMessages.value = updatedList
+            } finally {
+                isAiLoading.value = false
+            }
+        }
+    }
+
+    private suspend fun queryGeminiAPI(history: List<Pair<String, String>>, userMessage: String): String {
+        val apiKey = BuildConfig.GEMINI_API_KEY
+        if (apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY") {
+            isAiDemoMode.value = true
+            return getLocalAiDemoResponse(userMessage)
+        }
+
+        return withContext(Dispatchers.IO) {
+            try {
+                val mediaType = "application/json; charset=utf-8".toMediaType()
+                
+                val contentsArray = JSONArray()
+                
+                // Add history
+                history.forEach { (sender, text) ->
+                    val role = if (sender == "User") "user" else "model"
+                    val contentObj = JSONObject()
+                    contentObj.put("role", role)
+                    val partsArray = JSONArray()
+                    val partObj = JSONObject()
+                    partObj.put("text", text)
+                    partsArray.put(partObj)
+                    contentObj.put("parts", partsArray)
+                    contentsArray.put(contentObj)
+                }
+                
+                // Add newest prompt
+                val userContentObj = JSONObject()
+                userContentObj.put("role", "user")
+                val userPartsArray = JSONArray()
+                val userPartObj = JSONObject()
+                userPartObj.put("text", userMessage)
+                userPartsArray.put(userPartObj)
+                userContentObj.put("parts", userPartsArray)
+                contentsArray.put(userContentObj)
+
+                val bodyObj = JSONObject()
+                bodyObj.put("contents", contentsArray)
+
+                val sysInstructionObj = JSONObject()
+                val sysPartsArray = JSONArray()
+                val sysPartObj = JSONObject()
+                sysPartObj.put("text", "You are Uplift AI Coach, a friendly, professional AI Personal Training and Sports Assistant. Keep responses concise, encouraging, and focused on physical exercise, hypertrophy, athletic performance, and nutrition.")
+                sysPartsArray.put(sysPartObj)
+                sysInstructionObj.put("parts", sysPartsArray)
+                bodyObj.put("systemInstruction", sysInstructionObj)
+
+                val requestBodyStr = bodyObj.toString()
+                
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=$apiKey"
+                
+                val request = Request.Builder()
+                    .url(url)
+                    .post(requestBodyStr.toRequestBody(mediaType))
+                    .build()
+                
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val resBody = response.body?.string() ?: ""
+                    val resJson = JSONObject(resBody)
+                    val candidates = resJson.getJSONArray("candidates")
+                    val firstCandidate = candidates.getJSONObject(0)
+                    val content = firstCandidate.getJSONObject("content")
+                    val parts = content.getJSONArray("parts")
+                    val text = parts.getJSONObject(0).getString("text")
+                    text
+                } else {
+                    val code = response.code
+                    val errorMsg = response.body?.string() ?: "Unknown error"
+                    Log.e("AuraViewModel", "Gemini API Error $code: $errorMsg")
+                    "Error executing AI query (HTTP $code). Running in Demo Mode as fallback."
+                }
+            } catch (e: Exception) {
+                Log.e("AuraViewModel", "Gemini request execution failure", e)
+                "Exception calling Gemini: ${e.message}. Running in Demo Mode as fallback."
+            }
+        }
+    }
+
+    private fun getLocalAiDemoResponse(message: String): String {
+        val query = message.lowercase(Locale.US)
+        return when {
+            query.contains("bulk") || query.contains("gaining") || query.contains("gain") -> {
+                "💪 **BULK & MASS PROTOCOLS (Uplift Demo Coach)**\n\nTo build quality muscular weight without excess fat accumulation:\n\n• **Calorie Surplus**: Aim for +300 to +500 kcal above maintenance.\n• **Protein Target**: Consume 1.8g to 2.2g of protein per kg of bodyweight.\n• **Progression**: Focus on progressive overload in the 8-12 repetition range.\n• **Top Sources**: Lean beef, eggs, brown rice, peanut butter, and sweet potatoes."
+            }
+            query.contains("shred") || query.contains("lose") || query.contains("deficit") || query.contains("cut") -> {
+                "🔥 **FAT LOSS & RECOMPOSITION (Uplift Demo Coach)**\n\nTo maximize muscle preservation while accelerating lipid oxidation:\n\n• **Calorie Deficit**: Aim for -400 to -600 kcal beneath maintenance.\n• **Protein Buffer**: Increase to 2.2g+ per kg to safeguard lean muscle tissue.\n• **Cardio Interleaving**: Combine high-intensity drills in our Cardio Tab with steady-state walking.\n• **Hydration**: Drink 3200ml of pure water daily to flush metabolic waste."
+            }
+            query.contains("program") || query.contains("plan") || query.contains("workout") || query.contains("exercise") -> {
+                "🏋️ **STRENGTH & HYPERTROPHY BUILDER (Uplift Demo Coach)**\n\nHere is a solid compound training schedule:\n\n• **Day 1: Pull Day** (Lat Pulldowns, Row Drills, Bicep curls)\n• **Day 2: Push Day** (Diamond Push-ups, Barbell squats, overhead press)\n• **Day 3: Core & Recover** (Plank, dynamic stretches)\n\n*Press the 'Start Workout' buttons under our Programs tab to trigger live bio-interactive timers!*"
+            }
+            query.contains("score") || query.contains("optimal") -> {
+                "📈 **OPTIMAL FITNESS SCORE SYSTEMS (Uplift Demo Coach)**\n\nYour Fitness Score is computed from: \n\n1. **Workout Completion Consistency** (+5 pts per logged day).\n2. **Hydration Adherence** (+3 pts per 250ml cup).\n3. **Calorie Compliance** within your daily targeted threshold.\n\nKeep tracking your sets daily to unlock high-tier athletic achievements!"
+            }
+            query.contains("water") || query.contains("drink") || query.contains("hydrate") -> {
+                "💧 **HYDRATION DYNAMICS (Uplift Demo Coach)**\n\nMaintaining fluid compliance is critical for myofibrillar hydration and power output:\n\n• **Active Target**: 3000ml to 4000ml (12-16 cups) depending on rate of sweating.\n• **Key Windows**: Consume 500ml 1 hour before strength sessions, and sip 150ml every 15 minutes during training."
+            }
+            else -> {
+                val topics = listOf(
+                    "To build a strong V-taper frame, focus heavily on wide-grip pull-ups and lat pulldowns with slow 3-second negatives.",
+                    "Ensure you are logging sleep of 7-8 hours daily; recovery is when your muscles actively synthesize protein and grow.",
+                    "To target the inner chest and triceps, leverage the Diamond Push-ups in our strength inventory.",
+                    "Integrate dynamic stretches like Child's Pose and shoulder mobility work to stay injury-free and athletic."
+                )
+                "🌟 **Uplift AI Coach (Demo Mode)**\n\nI processed your query: *\"$message\"*\n\nHere is your custom coaching recommendation:\n\n• ${topics.random()}\n• Ensure you structure your daily calorie intake around your goal.\n• Remember to log daily accomplishments to build an unbroken training streak!\n\n*(Note: For unlimited, live Gemini answers matching any custom query, configure a valid API key in your workspace secrets!)*"
+            }
+        }
     }
 }

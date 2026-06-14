@@ -35,27 +35,34 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 val route by viewModel.currentRoute.collectAsStateWithLifecycle()
+                val activeTab by viewModel.activeDashboardTab.collectAsStateWithLifecycle()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = ObsidianBlack,
                     bottomBar = {
-                        // Display modern glassy bottom bar ONLY for primary screens
-                        if (route == "dashboard" || route == "history" || route == "settings" || route == "notifications") {
+                        // Display modern glassy bottom bar ONLY for dashboard primary screens
+                        if (route == "dashboard") {
                             NavigationBar(
-                                containerColor = ObsidianBlack.copy(alpha = 0.85f),
+                                containerColor = ObsidianBlack.copy(alpha = 0.92f),
                                 contentColor = AuraNeonCyan,
                                 tonalElevation = 0.dp,
                                 modifier = Modifier
-                                    .border(width = 1.dp, brush = Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.12f), Color.Transparent)), shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        brush = Brush.verticalGradient(
+                                            listOf(Color.White.copy(alpha = 0.12f), Color.Transparent)
+                                        ),
+                                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                                    )
                                     .navigationBarsPadding() // Mandate: Keep notch/navigation bar safe areas
                                     .testTag("app_navigation_bar")
                             ) {
                                 NavigationBarItem(
-                                    selected = route == "dashboard" || route == "notifications",
-                                    onClick = { viewModel.currentRoute.value = "dashboard" },
-                                    icon = { Icon(Icons.Default.Dashboard, "Home") },
-                                    label = { Text("Aura") },
+                                    selected = activeTab == 0,
+                                    onClick = { viewModel.activeDashboardTab.value = 0 },
+                                    icon = { Icon(Icons.Default.Home, "Home") },
+                                    label = { Text("Home") },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = ObsidianBlack,
                                         selectedTextColor = AuraNeonCyan,
@@ -63,14 +70,14 @@ class MainActivity : ComponentActivity() {
                                         unselectedIconColor = FrostWhite.copy(alpha = 0.4f),
                                         unselectedTextColor = FrostWhite.copy(alpha = 0.4f)
                                     ),
-                                    modifier = Modifier.testTag("nav_item_dashboard")
+                                    modifier = Modifier.testTag("nav_item_home")
                                 )
 
                                 NavigationBarItem(
-                                    selected = route == "history",
-                                    onClick = { viewModel.currentRoute.value = "history" },
-                                    icon = { Icon(Icons.Default.Timeline, "Logs") },
-                                    label = { Text("History") },
+                                    selected = activeTab == 1,
+                                    onClick = { viewModel.activeDashboardTab.value = 1 },
+                                    icon = { Icon(Icons.Default.Explore, "Explore") },
+                                    label = { Text("Explore") },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = ObsidianBlack,
                                         selectedTextColor = AuraNeonCyan,
@@ -78,14 +85,14 @@ class MainActivity : ComponentActivity() {
                                         unselectedIconColor = FrostWhite.copy(alpha = 0.4f),
                                         unselectedTextColor = FrostWhite.copy(alpha = 0.4f)
                                     ),
-                                    modifier = Modifier.testTag("nav_item_history")
+                                    modifier = Modifier.testTag("nav_item_explore")
                                 )
 
                                 NavigationBarItem(
-                                    selected = route == "settings",
-                                    onClick = { viewModel.currentRoute.value = "settings" },
-                                    icon = { Icon(Icons.Default.Settings, "Settings") },
-                                    label = { Text("Settings") },
+                                    selected = activeTab == 2,
+                                    onClick = { viewModel.activeDashboardTab.value = 2 },
+                                    icon = { Icon(Icons.Default.Star, "Programs") },
+                                    label = { Text("Programs") },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = ObsidianBlack,
                                         selectedTextColor = AuraNeonCyan,
@@ -93,7 +100,22 @@ class MainActivity : ComponentActivity() {
                                         unselectedIconColor = FrostWhite.copy(alpha = 0.4f),
                                         unselectedTextColor = FrostWhite.copy(alpha = 0.4f)
                                     ),
-                                    modifier = Modifier.testTag("nav_item_settings")
+                                    modifier = Modifier.testTag("nav_item_programs")
+                                )
+
+                                NavigationBarItem(
+                                    selected = activeTab == 3,
+                                    onClick = { viewModel.activeDashboardTab.value = 3 },
+                                    icon = { Icon(Icons.Default.Person, "Profile") },
+                                    label = { Text("Profile") },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = ObsidianBlack,
+                                        selectedTextColor = AuraNeonCyan,
+                                        indicatorColor = AuraNeonCyan,
+                                        unselectedIconColor = FrostWhite.copy(alpha = 0.4f),
+                                        unselectedTextColor = FrostWhite.copy(alpha = 0.4f)
+                                    ),
+                                    modifier = Modifier.testTag("nav_item_profile")
                                 )
                             }
                         }
@@ -103,7 +125,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(
-                                bottom = if (route == "dashboard" || route == "history" || route == "settings" || route == "notifications") 
+                                bottom = if (route == "dashboard") 
                                     innerPadding.calculateBottomPadding() 
                                 else 0.dp
                             )
@@ -112,20 +134,26 @@ class MainActivity : ComponentActivity() {
                         AnimatedContent(
                             targetState = route,
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
+                                val order = listOf("splash", "auth", "onboarding", "dashboard", "timer")
+                                val fromIdx = order.indexOf(initialState).takeIf { it >= 0 } ?: 0
+                                val toIdx = order.indexOf(targetState).takeIf { it >= 0 } ?: 0
+                                if (toIdx > fromIdx) {
+                                    (slideInHorizontally(animationSpec = tween(320)) { width -> width } + fadeIn(animationSpec = tween(280)))
+                                        .togetherWith(slideOutHorizontally(animationSpec = tween(285)) { width -> -width } + fadeOut(animationSpec = tween(220)))
+                                } else {
+                                    (slideInHorizontally(animationSpec = tween(320)) { width -> -width } + fadeIn(animationSpec = tween(280)))
+                                        .togetherWith(slideOutHorizontally(animationSpec = tween(285)) { width -> width } + fadeOut(animationSpec = tween(220)))
+                                }
                             },
                             label = "screen_routing"
                         ) { targetRoute ->
                             when (targetRoute) {
-                                "splash" -> SplashScreen()
+                                "splash" -> SplashScreen(viewModel = viewModel)
                                 "auth" -> AuthScreen(viewModel = viewModel)
                                 "onboarding" -> OnboardingScreen(viewModel = viewModel)
                                 "dashboard" -> DashboardScreen(viewModel = viewModel)
                                 "timer" -> WorkoutTimerScreen(viewModel = viewModel)
-                                "history" -> WorkoutHistoryScreen(viewModel = viewModel)
-                                "settings" -> SettingsScreen(viewModel = viewModel)
-                                "notifications" -> NotificationsScreen(viewModel = viewModel)
-                                else -> SplashScreen()
+                                else -> SplashScreen(viewModel = viewModel)
                             }
                         }
                     }

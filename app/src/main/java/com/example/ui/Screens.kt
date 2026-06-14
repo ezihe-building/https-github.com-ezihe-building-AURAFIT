@@ -1,10 +1,13 @@
 package com.example.ui
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,21 +18,27 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import kotlinx.coroutines.delay
-import androidx.compose.ui.res.stringResource
+import coil.compose.AsyncImage
+
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,9 +47,10 @@ import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.delay
+import kotlin.math.sin
 
 // ==========================================
-// CENTRAL GLASSMORPHISM & GRADIENT HELPER COMPOSABLES
+// CENTRAL GRADIENT & INTERACTION COMPOSABLES
 // ==========================================
 
 @Composable
@@ -50,32 +60,21 @@ fun AuraGradientBackground(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(ObsidianBlack)
+            .background(Color(0xFF04060A))
             .drawBehind {
-                // Frosted Glass Dynamic Mesh Background
-                // Top-Left Indigo-600/40 glow
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Color(0x664F46E5), Color.Transparent),
-                        radius = size.width * 1.1f
-                    ),
-                    center = androidx.compose.ui.geometry.Offset(x = -size.width * 0.1f, y = -size.height * 0.1f)
-                )
-                // Bottom-Right Rose-600/30 glow
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0x4CE11D48), Color.Transparent),
+                        colors = listOf(Color(0x3300FFC2), Color.Transparent),
                         radius = size.width * 1.2f
                     ),
-                    center = androidx.compose.ui.geometry.Offset(x = size.width * 1.1f, y = size.height * 1.1f)
+                    center = Offset(x = -size.width * 0.2f, y = -size.height * 0.1f)
                 )
-                // Middle-Right Violet-600/30 glow
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Color(0x4C7C3AED), Color.Transparent),
-                        radius = size.width * 1.0f
+                        colors = listOf(Color(0x228B5CF6), Color.Transparent),
+                        radius = size.width * 1.3f
                     ),
-                    center = androidx.compose.ui.geometry.Offset(x = size.width * 1.1f, y = size.height * 0.4f)
+                    center = Offset(x = size.width * 1.2f, y = size.height * 1.1f)
                 )
             }
     ) {
@@ -86,57 +85,42 @@ fun AuraGradientBackground(
 @Composable
 fun AuraGlassCard(
     modifier: Modifier = Modifier,
-    borderColor: Color = Color.White.copy(alpha = 0.20f),
-    backgroundColor: Color = Color.White.copy(alpha = 0.10f),
+    borderColor: Color = Color.White.copy(alpha = 0.08f),
+    backgroundColor: Color = Color(0xFF0D121F).copy(alpha = 0.85f),
+    onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
         modifier = modifier
+            .then(
+                if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+            )
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
-                    colors = listOf(borderColor, Color.White.copy(alpha = 0.02f))
+                    colors = listOf(borderColor, Color.Transparent)
                 ),
-                shape = RoundedCornerShape(24.dp)
+                shape = RoundedCornerShape(20.dp)
             ),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp) // Glass is usually flat/ambient with zero hard shadows
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(16.dp),
             content = content
         )
     }
 }
 
-@Composable
-fun AuraFloatingCard(
-    modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color.White.copy(alpha = 0.10f))
-            .border(
-                width = 1.2.dp,
-                brush = Brush.linearGradient(
-                    colors = listOf(Color.White.copy(alpha = 0.25f), Color.Transparent)
-                ),
-                shape = RoundedCornerShape(24.dp)
-            )
-            .padding(16.dp),
-        content = content
-    )
-}
-
 // ==========================================
-// 1. SPLASH / INTRO ROUTE
+// 1. SPLASH / INTRO SCREEN SLIDER (Image 2 & 20)
 // ==========================================
 
 @Composable
-fun SplashScreen() {
+fun SplashScreen(viewModel: AuraViewModel) {
+    var slideIndex by remember { mutableStateOf(0) }
+    
     AuraGradientBackground {
         Column(
             modifier = Modifier
@@ -144,88 +128,199 @@ fun SplashScreen() {
                 .padding(24.dp)
                 .safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier
-                    .size(110.dp)
-                    .clip(RoundedCornerShape(32.dp))
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(AuraNeonCyan, AuraAestheticPurple)
-                        )
-                    )
-                    .border(1.5.dp, FrostWhite.copy(alpha = 0.25f), RoundedCornerShape(32.dp)),
-                contentAlignment = Alignment.Center
+            // App Logo
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 16.dp)
             ) {
+                Icon(
+                    imageVector = Icons.Default.OfflineBolt,
+                    contentDescription = null,
+                    tint = AuraNeonCyan,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "AF",
-                    fontSize = 44.sp,
+                    text = "ULPIFIT",
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Black,
-                    color = ObsidianBlack,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.testTag("splash_logo")
+                    color = Color.White,
+                    letterSpacing = 2.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            // Image Slide Container with Glowing Rings
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                // Glow circles
+                Box(
+                    modifier = Modifier
+                        .size(220.dp)
+                        .scaleAnimation()
+                        .background(
+                            Brush.radialGradient(
+                                colors = if (slideIndex == 0) {
+                                    listOf(AuraNeonCyan.copy(alpha = 0.15f), Color.Transparent)
+                                } else {
+                                    listOf(AuraAestheticPurple.copy(alpha = 0.15f), Color.Transparent)
+                                }
+                            )
+                        )
+                )
 
-            Text(
-                text = "AURAFIT",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = FrostWhite,
-                letterSpacing = 4.sp
-            )
+                // Simulated dynamic illustration
+                Box(
+                    modifier = Modifier
+                        .size(160.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF0F1524))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (slideIndex == 0) Icons.Default.RestaurantMenu else Icons.Default.DirectionsRun,
+                        contentDescription = null,
+                        tint = if (slideIndex == 0) AuraNeonCyan else AuraAestheticPurple,
+                        modifier = Modifier.size(54.dp)
+                    )
+                }
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Carousel Slide Content
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                AnimatedContent(
+                    targetState = slideIndex,
+                    transitionSpec = {
+                        fadeIn() togetherWith fadeOut()
+                    },
+                    label = "slide_text"
+                ) { index ->
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            text = if (index == 0) "Personalized Nutrition Starts Here" else "Personalized Workout & Training",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 32.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = if (index == 0) {
+                                "Based on your unique goals, body type, and dietary preferences, find the perfect fuel for your routine."
+                            } else {
+                                "Tailored exercises for your strength level. Build solid back, chest, and lower body structures with perfect form."
+                            },
+                            fontSize = 14.sp,
+                            color = FrostWhite.copy(alpha = 0.6f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
 
-            Text(
-                text = "Unbreakable discipline. Seamless streaks.",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = AuraNeonCyan.copy(alpha = 0.85f),
-                textAlign = TextAlign.Center
-            )
+                Spacer(modifier = Modifier.height(30.dp))
 
-            Spacer(modifier = Modifier.height(48.dp))
+                // Page Indicator Dots
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(height = 6.dp, width = if (slideIndex == 0) 18.dp else 6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(if (slideIndex == 0) AuraNeonCyan else Color.White.copy(alpha = 0.2f))
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(height = 6.dp, width = if (slideIndex == 1) 18.dp else 6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(if (slideIndex == 1) AuraNeonCyan else Color.White.copy(alpha = 0.2f))
+                    )
+                }
 
-            CircularProgressIndicator(
-                color = AuraNeonCyan,
-                strokeWidth = 3.dp,
-                modifier = Modifier.size(36.dp)
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "Initializing secure session...",
-                fontSize = 12.sp,
-                color = FrostWhite.copy(alpha = 0.5f),
-                letterSpacing = 1.sp
-            )
+                // Interactive Navigation CTA
+                Button(
+                    onClick = {
+                        if (slideIndex == 0) {
+                            slideIndex = 1
+                        } else {
+                            viewModel.currentRoute.value = "auth"
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("splash_next_button"),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (slideIndex == 0) AuraNeonCyan else AuraAestheticPurple,
+                        contentColor = ObsidianBlack
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = if (slideIndex == 0) "Explore  →" else "Browse Workouts  →",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
 
+// Scale pulsation animation utility
+@Composable
+fun Modifier.scaleAnimation(): Modifier {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = EaseInOutSine),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "scale"
+    )
+    return this.scale(scale)
+}
+
 // ==========================================
-// 2. AUTHENTICATION (SIGN UP & LOGIN) ROUTE
+// 2. REDESIGNED AUTH SCREENS (Image 4 & 5 & 3 & 9)
 // ==========================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthScreen(viewModel: AuraViewModel) {
     val email by viewModel.authEmailInput.collectAsStateWithLifecycle()
     val password by viewModel.authPasswordInput.collectAsStateWithLifecycle()
-    val checkToken by viewModel.authResetTokenInput.collectAsStateWithLifecycle()
+    val nameInput by viewModel.authNameInput.collectAsStateWithLifecycle()
+    val resetToken by viewModel.authResetTokenInput.collectAsStateWithLifecycle()
     val resetPassword by viewModel.authResetPasswordInput.collectAsStateWithLifecycle()
-    
+    val otpInput by viewModel.authOtpInput.collectAsStateWithLifecycle()
+
     val error by viewModel.authError.collectAsStateWithLifecycle()
     val success by viewModel.authSuccess.collectAsStateWithLifecycle()
     val isLoading by viewModel.isAuthLoading.collectAsStateWithLifecycle()
-
-    val authMode by viewModel.authModeModel.collectAsStateWithLifecycle()
-    var showGoogleSheet by remember { mutableStateOf(false) }
+    val authMode by viewModel.authModeModel.collectAsStateWithLifecycle() // login, register, forgot, verify_otp
 
     AuraGradientBackground {
         Box(
@@ -237,1922 +332,711 @@ fun AuthScreen(viewModel: AuraViewModel) {
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(0.95f),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Interactive Brand Icon
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(
-                            Brush.linearGradient(colors = listOf(AuraNeonCyan, AuraAestheticPurple))
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FitnessCenter,
-                        contentDescription = "Fitness Icon",
-                        tint = ObsidianBlack,
-                        modifier = Modifier.size(36.dp)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // App Brand Identity
+                Icon(
+                    imageVector = Icons.Default.OfflineBolt,
+                    contentDescription = null,
+                    tint = AuraNeonCyan,
+                    modifier = Modifier.size(54.dp)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                AnimatedContent(
+                    targetState = authMode,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "auth_headers"
+                ) { mode ->
+                    Text(
+                        text = when (mode) {
+                            "register" -> "Sign up for free"
+                            "login" -> "Sign in to Ulpifit"
+                            "forgot" -> "Reset password"
+                            "verify_otp" -> "OTP Verification"
+                            else -> "Sign in to Ulpifit"
+                        },
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "A UR A F I T",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = FrostWhite,
-                    letterSpacing = 5.sp
-                )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                AuraGlassCard(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = when (authMode) {
-                            "login" -> "Secure Sign In"
-                            "register" -> "Create Account"
-                            "forgot" -> "Recover Password"
-                            "verify_otp" -> "Verify Your Identity"
-                            else -> "Confirm Reset Code"
-                        },
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = FrostWhite,
-                        modifier = Modifier.testTag("auth_heading")
-                    )
-
-                    Text(
-                        text = when (authMode) {
-                            "login" -> "Enter your email and keys to sync achievements."
-                            "register" -> "Join AuraFit today. Everything is tracked locally."
-                            "forgot" -> "Generate secure recovery verification tokens."
-                            "verify_otp" -> "Secured with Clerk Security Authentication."
-                            else -> "Perform actual resets against local hash algorithms."
-                        },
-                        fontSize = 13.sp,
-                        color = FrostWhite.copy(alpha = 0.65f),
-                        modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
-                    )
-
-                    // Error & Success indicators
-                    AnimatedVisibility(visible = error != null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                                .background(AuraAccentCoral.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                                .border(1.dp, AuraAccentCoral, RoundedCornerShape(10.dp))
-                                .padding(12.dp)
-                        ) {
-                            Text(
-                                text = error ?: "",
-                                color = Color.Red,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    AnimatedVisibility(visible = success != null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                                .background(AuraActiveEmerald.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-                                .border(1.dp, AuraActiveEmerald, RoundedCornerShape(10.dp))
-                                .padding(12.dp)
-                        ) {
-                            Text(
-                                text = success ?: "",
-                                color = AuraNeonCyan,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-
-                    if (authMode == "login" || authMode == "register" || authMode == "forgot") {
-                        // Email input
-                        OutlinedTextField(
-                            value = email,
-                            onValueChange = { 
-                                viewModel.clearAuthMessages()
-                                viewModel.authEmailInput.value = it 
-                            },
-                            label = { Text("Email Address") },
-                            leadingIcon = { Icon(Icons.Default.Email, "Email", tint = AuraNeonCyan) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = FrostWhite,
-                                unfocusedTextColor = FrostWhite,
-                                focusedBorderColor = AuraNeonCyan,
-                                unfocusedBorderColor = FrostWhite.copy(alpha = 0.2f),
-                                focusedLabelColor = AuraNeonCyan,
-                                unfocusedLabelColor = FrostWhite.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("auth_email_input"),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-
-                    if (authMode == "login" || authMode == "register") {
-                        // Password input
-                        OutlinedTextField(
-                            value = password,
-                            onValueChange = { 
-                                viewModel.clearAuthMessages()
-                                viewModel.authPasswordInput.value = it 
-                            },
-                            label = { Text("Secure Password") },
-                            leadingIcon = { Icon(Icons.Default.Lock, "Lock", tint = AuraNeonCyan) },
-                            visualTransformation = PasswordVisualTransformation(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = FrostWhite,
-                                unfocusedTextColor = FrostWhite,
-                                focusedBorderColor = AuraNeonCyan,
-                                unfocusedBorderColor = FrostWhite.copy(alpha = 0.2f),
-                                focusedLabelColor = AuraNeonCyan,
-                                unfocusedLabelColor = FrostWhite.copy(alpha = 0.5f)
-                            ),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("auth_password_input"),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-                        )
-                    }
-
-                    if (authMode == "reset") {
-                        // Token and New Password input
-                        OutlinedTextField(
-                            value = checkToken,
-                            onValueChange = { viewModel.authResetTokenInput.value = it },
-                            label = { Text("6-Digit Reset Code") },
-                            leadingIcon = { Icon(Icons.Default.Key, "Key", tint = AuraAestheticPurple) },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = FrostWhite,
-                                unfocusedTextColor = FrostWhite,
-                                focusedBorderColor = AuraAestheticPurple,
-                                unfocusedBorderColor = FrostWhite.copy(alpha = 0.2f),
-                                focusedLabelColor = AuraAestheticPurple
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = resetPassword,
-                            onValueChange = { viewModel.authResetPasswordInput.value = it },
-                            label = { Text("New Secure Password") },
-                            leadingIcon = { Icon(Icons.Default.Lock, "Lock", tint = AuraNeonCyan) },
-                            visualTransformation = PasswordVisualTransformation(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = FrostWhite,
-                                unfocusedTextColor = FrostWhite,
-                                focusedBorderColor = AuraNeonCyan,
-                                unfocusedBorderColor = FrostWhite.copy(alpha = 0.2f),
-                                focusedLabelColor = AuraNeonCyan
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    if (authMode == "verify_otp") {
-                        val otpInput by viewModel.authOtpInput.collectAsStateWithLifecycle()
-                        val expectedCode by viewModel.expectedOtp.collectAsStateWithLifecycle()
-
-                        Text(
-                            text = "Please enter the 6-digit OTP code below to verify your device session.",
-                            fontSize = 13.sp,
-                            color = FrostWhite.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-
-                        // 6 spacious glass boxes for a premium authentic feel
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
-                        ) {
-                            for (i in 0 until 6) {
-                                val digit = otpInput.getOrNull(i)?.toString() ?: ""
-                                val isFocused = otpInput.length == i
-
-                                Box(
-                                    modifier = Modifier
-                                        .size(width = 44.dp, height = 54.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(FrostWhite.copy(alpha = 0.06f))
-                                        .border(
-                                            width = 1.5.dp,
-                                            color = if (isFocused) AuraNeonCyan else FrostWhite.copy(alpha = 0.12f),
-                                            shape = RoundedCornerShape(12.dp)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = digit,
-                                        fontSize = 22.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = if (digit.isNotEmpty()) AuraNeonCyan else FrostWhite.copy(alpha = 0.3f)
-                                    )
-                                }
-                            }
-                        }
-
-                        // Input captures numeric entries
-                        OutlinedTextField(
-                            value = otpInput,
-                            onValueChange = { 
-                                if (it.length <= 6 && it.all { ch -> ch.isDigit() }) {
-                                    viewModel.authOtpInput.value = it
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(54.dp)
-                                .testTag("auth_otp_field"),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = FrostWhite,
-                                unfocusedTextColor = FrostWhite,
-                                focusedBorderColor = AuraNeonCyan,
-                                unfocusedBorderColor = FrostWhite.copy(alpha = 0.12f),
-                                focusedLabelColor = AuraNeonCyan
-                            ),
-                            label = { Text("Enter Verification Code") },
-                            leadingIcon = { Icon(Icons.Default.CheckCircle, "Verification", tint = AuraNeonCyan) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 16.dp, bottom = 8.dp)
-                                .background(AuraNeonCyan.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                                .border(1.dp, AuraNeonCyan.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                                .padding(12.dp)
-                        ) {
-                            Column {
-                                Text(
-                                    text = "🔒 Clerk Live Sandbox Simulation",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = AuraNeonCyan
-                                )
-                                Text(
-                                    text = "Your auto-simulated verification code is: ${expectedCode ?: "......"}",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = FrostWhite,
-                                    modifier = Modifier.padding(top = 2.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // Main Act Button
-                    Button(
-                        onClick = {
-                            when (authMode) {
-                                "login" -> viewModel.triggerLogIn()
-                                "register" -> viewModel.triggerSignUp()
-                                "verify_otp" -> viewModel.verifyOtpAndCompleteSignUp()
-                                "forgot" -> {
-                                    viewModel.triggerForgotPassword()
-                                    viewModel.authModeModel.value = "reset"
-                                }
-                                else -> {
-                                    viewModel.triggerResetPassword()
-                                    viewModel.authModeModel.value = "login"
-                                }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .testTag("auth_submit_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AuraNeonCyan,
-                            contentColor = ObsidianBlack
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(color = ObsidianBlack, modifier = Modifier.size(24.dp))
-                        } else {
-                            Text(
-                                text = when (authMode) {
-                                    "login" -> "Sign In"
-                                    "register" -> "Create Account"
-                                    "verify_otp" -> "Verify Credentials"
-                                    "forgot" -> "Send Code"
-                                    else -> "Reset Password"
-                                },
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Secondary action toggle
-                    TextButton(
-                        onClick = {
-                            viewModel.clearAuthMessages()
-                            viewModel.authModeModel.value = when (authMode) {
-                                "login" -> "register"
-                                "register" -> "login"
-                                "forgot" -> "login"
-                                "verify_otp" -> "register"
-                                else -> "login"
-                            }
-                        },
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    ) {
-                        Text(
-                            text = when (authMode) {
-                                "login" -> "Don't have an account? Sign Up"
-                                "register" -> "Already have an account? Log In"
-                                "verify_otp" -> "Back to Registration"
-                                else -> "Back to Sign In"
-                            },
-                            color = AuraNeonCyan,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    if (authMode == "login") {
-                        TextButton(
-                            onClick = {
-                                viewModel.clearAuthMessages()
-                                viewModel.authModeModel.value = "forgot"
-                            },
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        ) {
-                            Text(
-                                text = "Forgot password?",
-                                color = FrostWhite.copy(alpha = 0.5f),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = FrostWhite.copy(alpha = 0.1f))
-                        Text(
-                            text = "OR CONTINUE WITH",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = FrostWhite.copy(alpha = 0.45f),
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        )
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = FrostWhite.copy(alpha = 0.1f))
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Authentic Google button
-                    OutlinedButton(
-                        onClick = { showGoogleSheet = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("google_sso_button"),
-                        border = BorderStroke(1.dp, FrostWhite.copy(alpha = 0.12f)),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = FrostWhite)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "G",
-                                fontWeight = FontWeight.Black,
-                                color = AuraNeonCyan,
-                                fontSize = 18.sp,
-                                modifier = Modifier.padding(end = 10.dp)
-                            )
-                            Text("Secure Sign In with Google", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Quick Guest Bypass button
-                    Button(
-                        onClick = { viewModel.triggerGuestMode() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("guest_bypass_button"),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = AuraNeonCyan.copy(alpha = 0.15f),
-                            contentColor = AuraNeonCyan
-                        ),
-                        border = BorderStroke(1.dp, AuraNeonCyan.copy(alpha = 0.4f)),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Bolt,
-                                contentDescription = "Quick Bypass icon",
-                                tint = AuraNeonCyan,
-                                modifier = Modifier.size(18.dp).padding(end = 6.dp)
-                            )
-                            Text("Bypass: Enter as Instant Guest", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
-                    }
-                }
-            }
-
-            // Google account selection simulation dialog
-            if (showGoogleSheet) {
-                AlertDialog(
-                    onDismissRequest = { showGoogleSheet = false },
-                    containerColor = ObsidianBlack.copy(alpha = 0.96f),
-                    modifier = Modifier.border(1.dp, AuraNeonCyan.copy(alpha = 0.25f), RoundedCornerShape(24.dp)),
-                    title = {
-                        Text("Verify Google Identity", fontWeight = FontWeight.Bold, color = FrostWhite, fontSize = 18.sp)
-                    },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(
-                                "Choose an active Google Google Identity token to synchronize and secure your statistics.",
-                                color = FrostWhite.copy(alpha = 0.6f),
-                                fontSize = 12.sp
-                            )
-                            
-                            val accounts = listOf(
-                                "alpha.athlete@gmail.com",
-                                "discipline.warrior@gmail.com",
-                                "aurafit.legacy@gmail.com"
-                            )
-                            
-                            accounts.forEach { acc ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(FrostWhite.copy(alpha = 0.04f))
-                                        .clickable {
-                                            showGoogleSheet = false
-                                            viewModel.triggerGoogleSSO(acc)
-                                        }
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(32.dp)
-                                            .background(AuraNeonCyan.copy(alpha = 0.15f), CircleShape),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(acc.take(1).uppercase(), color = AuraNeonCyan, fontWeight = FontWeight.Bold)
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(acc, color = FrostWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-                            
-                            var customEmailInput by remember { mutableStateOf("") }
-                            OutlinedTextField(
-                                value = customEmailInput,
-                                onValueChange = { customEmailInput = it },
-                                label = { Text("Use custom Google account email") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = FrostWhite,
-                                    unfocusedTextColor = FrostWhite,
-                                    focusedBorderColor = AuraNeonCyan,
-                                    unfocusedBorderColor = FrostWhite.copy(alpha = 0.15f)
-                                ),
-                                trailingIcon = {
-                                    if (customEmailInput.contains("@")) {
-                                        IconButton(
-                                            onClick = {
-                                                showGoogleSheet = false
-                                                viewModel.triggerGoogleSSO(customEmailInput.trim())
-                                            }
-                                        ) {
-                                            Icon(Icons.Default.Check, "submit", tint = AuraActiveEmerald)
-                                        }
-                                    }
-                                }
-                            )
-                        }
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showGoogleSheet = false }) {
-                            Text("Back", color = AuraAccentCoral)
-                        }
-                    }
-                )
-            }
-        }
-    }
-}
-
-// ==========================================
-// 3. ONBOARDING QUESTIONS ROUTE
-// ==========================================
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun OnboardingScreen(viewModel: AuraViewModel) {
-    val name by viewModel.onboardName.collectAsStateWithLifecycle()
-    val age by viewModel.onboardAge.collectAsStateWithLifecycle()
-    val gender by viewModel.onboardGender.collectAsStateWithLifecycle()
-    val height by viewModel.onboardHeight.collectAsStateWithLifecycle()
-    val weight by viewModel.onboardWeight.collectAsStateWithLifecycle()
-    val goal by viewModel.onboardGoal.collectAsStateWithLifecycle()
-    val level by viewModel.onboardExperience.collectAsStateWithLifecycle()
-    val minutes by viewModel.onboardWorkoutMinutes.collectAsStateWithLifecycle()
-    val disciplinePlan by viewModel.onboardPlan.collectAsStateWithLifecycle()
-    
-    val error by viewModel.onboardingError.collectAsStateWithLifecycle()
-
-    var statusPhase by remember { mutableStateOf(1) } // Phase 1: profile facts, Phase 2: goals & discipline plans
-
-    AuraGradientBackground {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp)
-                .safeDrawingPadding()
-        ) {
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Interactive Progress Bar
-                LinearProgressIndicator(
-                    progress = if (statusPhase == 1) 0.5f else 1.0f,
-                    color = AuraNeonCyan,
-                    trackColor = FrostWhite.copy(alpha = 0.1f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(CircleShape)
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Text(
-                    text = "DISCIPLINE FORM",
-                    color = AuraNeonCyan,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-
-                Text(
-                    text = if (statusPhase == 1) "About Yourself" else "Your Fitness Blueprint",
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = FrostWhite
-                )
-
-                Text(
-                    text = if (statusPhase == 1) 
-                        "Input your physical dimensions to compute accurate calorie expenditure models." 
-                    else "Choose an actionable milestone period to develop unbroken consistency.",
-                    fontSize = 14.sp,
-                    color = FrostWhite.copy(alpha = 0.65f),
-                    modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
-                )
-
-                AnimatedVisibility(visible = error != null) {
+                // Error / Success Message
+                if (error != null) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                            .background(AuraAccentCoral.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
-                            .border(1.dp, AuraAccentCoral, RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF3B0B14))
+                            .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(10.dp))
                             .padding(12.dp)
                     ) {
-                        Text(text = error ?: "", color = Color.Red, fontSize = 13.sp)
+                        Text(
+                            text = error ?: "",
+                            color = Color(0xFFFCA5A5),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
-                if (statusPhase == 1) {
-                    // PHASE 1: User facts
-                    AuraGlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Text("Personal Credentials", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                        Spacer(modifier = Modifier.height(14.dp))
+                if (success != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFF2E190A))
+                            .border(1.dp, AuraNeonCyan, RoundedCornerShape(10.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = success ?: "",
+                            color = Color(0xFFFFCC99),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
-                        // Name
+                // Dynamic forms based on Auth Modes
+                when (authMode) {
+                    "register" -> {
+                        // Sign up for free (Image 4)
                         OutlinedTextField(
-                            value = name,
-                            onValueChange = { viewModel.onboardName.value = it },
-                            label = { Text("Display Name") },
-                            leadingIcon = { Icon(Icons.Default.Person, "user", tint = AuraNeonCyan) },
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = FrostWhite, unfocusedTextColor = FrostWhite, focusedBorderColor = AuraNeonCyan),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("onboard_name_input"),
-                            singleLine = true
+                            value = nameInput,
+                            onValueChange = { viewModel.authNameInput.value = it },
+                            label = { Text("Display Name", color = Color.White.copy(alpha = 0.4f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AuraNeonCyan,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("auth_name_field")
                         )
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { viewModel.authEmailInput.value = it },
+                            label = { Text("Email address", color = Color.White.copy(alpha = 0.4f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AuraNeonCyan,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("auth_email_field")
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { viewModel.authPasswordInput.value = it },
+                            label = { Text("Password", color = Color.White.copy(alpha = 0.4f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AuraNeonCyan,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth().testTag("auth_password_field")
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = {
+                                viewModel.onboardName.value = nameInput
+                                viewModel.triggerSignUp()
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("auth_signup_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            // Age
-                            OutlinedTextField(
-                                value = age,
-                                onValueChange = { viewModel.onboardAge.value = it },
-                                label = { Text("Age") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = FrostWhite, unfocusedTextColor = FrostWhite, focusedBorderColor = AuraNeonCyan),
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
-                            )
-
-                            // Gender dropdown button simulation
-                            Box(modifier = Modifier.weight(1f)) {
-                                Column {
-                                    Text("Gender", color = FrostWhite.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.padding(bottom = 4.dp))
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(56.dp)
-                                            .background(CosmicSlate, RoundedCornerShape(6.dp))
-                                            .border(
-                                                1.dp,
-                                                if (gender == "Male") AuraNeonCyan else FrostWhite.copy(
-                                                    alpha = 0.2f
-                                                ),
-                                                RoundedCornerShape(6.dp)
-                                            )
-                                            .clickable {
-                                                viewModel.onboardGender.value =
-                                                    if (gender == "Male") "Female" else "Male"
-                                            }
-                                            .padding(horizontal = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(gender, color = FrostWhite, fontWeight = FontWeight.Bold)
-                                        Icon(Icons.Default.SwapVert, "gender", tint = AuraNeonCyan)
-                                    }
-                                }
+                            if (isLoading) {
+                                CircularProgressIndicator(color = ObsidianBlack, modifier = Modifier.size(24.dp))
+                            } else {
+                                Text("Sign Up", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Height
-                            OutlinedTextField(
-                                value = height,
-                                onValueChange = { viewModel.onboardHeight.value = it },
-                                label = { Text("Height (cm)") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = FrostWhite, unfocusedTextColor = FrostWhite, focusedBorderColor = AuraNeonCyan),
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Already have an account? ", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp)
+                            Text(
+                                "Sign In",
+                                color = AuraNeonCyan,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable {
+                                    viewModel.clearAuthMessages()
+                                    viewModel.authModeModel.value = "login"
+                                }
                             )
+                        }
+                    }
 
-                            // Weight
-                            OutlinedTextField(
-                                value = weight,
-                                onValueChange = { viewModel.onboardWeight.value = it },
-                                label = { Text("Weight (kg)") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = FrostWhite, unfocusedTextColor = FrostWhite, focusedBorderColor = AuraNeonCyan),
-                                modifier = Modifier.weight(1f),
-                                singleLine = true
+                    "login" -> {
+                        // Sign in to Ulpifit (Image 5)
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { viewModel.authEmailInput.value = it },
+                            label = { Text("Email address", color = Color.White.copy(alpha = 0.4f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AuraNeonCyan,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().testTag("auth_email_field")
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { viewModel.authPasswordInput.value = it },
+                            label = { Text("Password", color = Color.White.copy(alpha = 0.4f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AuraNeonCyan,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth().testTag("auth_password_field")
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            Text(
+                                "Forgot password?",
+                                color = AuraNeonCyan.copy(alpha = 0.8f),
+                                fontSize = 13.sp,
+                                modifier = Modifier.clickable {
+                                    viewModel.clearAuthMessages()
+                                    viewModel.authModeModel.value = "forgot"
+                                }
                             )
                         }
 
                         Spacer(modifier = Modifier.height(24.dp))
 
                         Button(
-                            onClick = {
-                                if (name.trim().isEmpty()) {
-                                    viewModel.onboardingError.value = "Please complete display name."
-                                } else {
-                                    statusPhase = 2
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                            onClick = { viewModel.triggerLogIn() },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(50.dp),
+                                .height(50.dp)
+                                .testTag("auth_login_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Next: Blueprints", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            if (isLoading) {
+                                CircularProgressIndicator(color = ObsidianBlack, modifier = Modifier.size(24.dp))
+                            } else {
+                                Text("Sign In", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Don't have an account? ", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp)
+                            Text(
+                                "Sign Up",
+                                color = AuraNeonCyan,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.clickable {
+                                    viewModel.clearAuthMessages()
+                                    viewModel.authModeModel.value = "register"
+                                }
+                            )
                         }
                     }
-                } else {
-                    // PHASE 2: Fitness settings
-                    AuraGlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Text("Goal Setting", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                        
-                        // Select Goal Button options
-                        Spacer(modifier = Modifier.height(8.dp))
-                        listOf("Thriving Athleticism", "Aesthetic Lean Mode", "Heavy Weight Gain", "Cardio Conditioning").forEach { opt ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (goal == opt) AuraNeonCyan.copy(alpha = 0.15f) else CosmicSlate)
-                                    .border(
-                                        1.dp,
-                                        if (goal == opt) AuraNeonCyan else Color.Transparent,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { viewModel.onboardGoal.value = opt }
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(opt, color = if (goal == opt) AuraNeonCyan else FrostWhite, fontWeight = if (goal == opt) FontWeight.Bold else FontWeight.Medium)
-                                RadioButton(
-                                    selected = goal == opt,
-                                    onClick = { viewModel.onboardGoal.value = opt },
-                                    colors = RadioButtonDefaults.colors(selectedColor = AuraNeonCyan, unselectedColor = FrostWhite.copy(alpha = 0.4f))
-                                )
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Commitment Blueprint Period", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Challenge Plans
-                        listOf("60 Day Plan", "150 Day Plan", "365 Day Plan", "2 Year Discipline Plan").forEach { plan ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(if (disciplinePlan == plan) AuraAestheticPurple.copy(alpha = 0.15f) else CosmicSlate)
-                                    .border(
-                                        1.dp,
-                                        if (disciplinePlan == plan) AuraAestheticPurple else Color.Transparent,
-                                        RoundedCornerShape(10.dp)
-                                    )
-                                    .clickable { viewModel.onboardPlan.value = plan }
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(plan, color = if (disciplinePlan == plan) AuraAestheticPurple else FrostWhite, fontWeight = FontWeight.Bold)
-                                    val desc = when (plan) {
-                                        "60 Day Plan" -> "Develop baseline active habits."
-                                        "150 Day Plan" -> "Deep neurological adaptations."
-                                        "365 Day Plan" -> "Complete body reconfiguration."
-                                        else -> "Ultimate warrior-tier lifestyle."
-                                    }
-                                    Text(desc, color = FrostWhite.copy(alpha = 0.5f), fontSize = 11.sp)
-                                }
-                                Icon(
-                                    imageVector = if (disciplinePlan == plan) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                                    contentDescription = null,
-                                    tint = if (disciplinePlan == plan) AuraAestheticPurple else FrostWhite.copy(alpha = 0.4f)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text("Experience & Commitment", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            // Exp Level
-                            Box(modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (level == "Beginner") AuraNeonCyan.copy(alpha = 0.15f) else CosmicSlate)
-                                .border(
-                                    1.dp,
-                                    if (level == "Beginner") AuraNeonCyan else FrostWhite.copy(alpha = 0.1f),
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .clickable { viewModel.onboardExperience.value = "Beginner" },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("Beginner", color = if (level == "Beginner") AuraNeonCyan else FrostWhite, fontWeight = FontWeight.Bold)
-                            }
-
-                            Box(modifier = Modifier
-                                .weight(1f)
-                                .height(52.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (level == "Advanced") AuraNeonCyan.copy(alpha = 0.15f) else CosmicSlate)
-                                .border(
-                                    1.dp,
-                                    if (level == "Advanced") AuraNeonCyan else FrostWhite.copy(alpha = 0.1f),
-                                    RoundedCornerShape(10.dp)
-                                )
-                                .clickable { viewModel.onboardExperience.value = "Advanced" },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text("Advanced Training", color = if (level == "Advanced") AuraNeonCyan else FrostWhite, fontWeight = FontWeight.Bold)
-                            }
-                        }
+                    "forgot" -> {
+                        // Reset Password Screen (Image 3)
+                        Text(
+                            text = "We'll send you offline instruction tokens to reset your password.",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
 
                         Spacer(modifier = Modifier.height(20.dp))
-                        Text("Planned Daily Workout Commitment", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                        Text("How much time will you spend on discipline daily?", fontSize = 11.sp, color = FrostWhite.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            listOf("15", "30", "45", "60").forEach { minOpt ->
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(44.dp)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(if (minutes == minOpt) AuraNeonCyan.copy(alpha = 0.15f) else CosmicSlate)
-                                        .border(
-                                            1.dp,
-                                            if (minutes == minOpt) AuraNeonCyan else FrostWhite.copy(alpha = 0.1f),
-                                            RoundedCornerShape(10.dp)
-                                        )
-                                        .clickable { viewModel.onboardWorkoutMinutes.value = minOpt },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("$minOpt min", color = if (minutes == minOpt) AuraNeonCyan else FrostWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                }
-                            }
-                        }
+
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { viewModel.authEmailInput.value = it },
+                            label = { Text("Email address", color = Color.White.copy(alpha = 0.4f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AuraNeonCyan,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // Navigation Row Buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        Button(
+                            onClick = { viewModel.triggerForgotPassword() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            OutlinedButton(
-                                onClick = { statusPhase = 1 },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = FrostWhite),
-                                border = BorderStroke(1.dp, FrostWhite.copy(alpha = 0.3f))
-                            ) {
-                                Text("Back")
-                            }
+                            Text("Send instruction", fontWeight = FontWeight.Bold)
+                        }
 
-                            Button(
-                                onClick = { viewModel.completeOnboardingSubmission() },
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        if (resetToken.isNotEmpty()) {
+                            // Offline verification token received -> directly key in password change!
+                            Box(
                                 modifier = Modifier
-                                    .weight(2f)
-                                    .height(50.dp)
-                                    .testTag("onboard_finish_button"),
-                                colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack)
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(Color(0xFF0F1626))
+                                    .border(1.dp, AuraNeonCyan.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                                    .padding(14.dp)
                             ) {
-                                Text("Generate Blueprint", fontWeight = FontWeight.Bold)
+                                Column {
+                                    Text("Reset Code Generated: $resetToken", fontWeight = FontWeight.Bold, color = AuraNeonCyan)
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    OutlinedTextField(
+                                        value = resetPassword,
+                                        onValueChange = { viewModel.authResetPasswordInput.value = it },
+                                        label = { Text("New Password") },
+                                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AuraNeonCyan),
+                                        shape = RoundedCornerShape(8.dp),
+                                        visualTransformation = PasswordVisualTransformation(),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Button(
+                                        onClick = { viewModel.triggerResetPassword() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Save Password")
+                                    }
+                                }
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text(
+                            text = "Back to Login",
+                            color = AuraNeonCyan,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.clickable {
+                                viewModel.clearAuthMessages()
+                                viewModel.authModeModel.value = "login"
+                            }
+                        )
+                    }
+
+                    "verify_otp" -> {
+                        // Clerk Code OTP view (Image 7/Verification setup)
+                        Text(
+                            text = "Please enter the 6-digit verification code sent to your inbox.",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        OutlinedTextField(
+                            value = otpInput,
+                            onValueChange = { viewModel.authOtpInput.value = it },
+                            label = { Text("Security Code", color = Color.White.copy(alpha = 0.4f)) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = AuraNeonCyan,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.15f)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth().testTag("auth_otp_field")
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Button(
+                            onClick = { viewModel.verifyOtpAndCompleteSignUp() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("auth_verify_button"),
+                            colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Complete Registration", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-            }
-        }
-    }
-}
 
-// ==========================================
-// 4. MAIN DASHBOARD ROUTE
-// ==========================================
+                Spacer(modifier = Modifier.height(30.dp))
 
-@Composable
-fun DashboardScreen(viewModel: AuraViewModel) {
-    val activeEmailVal by viewModel.activeEmail.collectAsStateWithLifecycle()
-    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
-    val streak by viewModel.activeStreak.collectAsStateWithLifecycle()
-    val count by viewModel.totalWorkoutsCompletedCount.collectAsStateWithLifecycle()
-    val calories by viewModel.cumulativeCaloriesBurned.collectAsStateWithLifecycle()
-    val minutes by viewModel.cumulativeDurationMinutes.collectAsStateWithLifecycle()
+                // Social Single Sign On Integration Widget
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Divider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.08f))
+                    Text("Or continue with", modifier = Modifier.padding(horizontal = 14.dp), color = Color.White.copy(alpha = 0.3f), fontSize = 12.sp)
+                    Divider(modifier = Modifier.weight(1f), color = Color.White.copy(alpha = 0.08f))
+                }
 
-    // Dynamically query suitable customized presets
-    val recommendedExercises = remember(profile) {
-        WorkoutPreset.getRecommendedExercises(
-            gender = profile?.gender ?: "Male",
-            experience = profile?.experienceLevel ?: "Beginner",
-            fitnessGoal = profile?.fitnessGoal ?: "Muscle Gain"
-        )
-    }
+                Spacer(modifier = Modifier.height(18.dp))
 
-    AuraGradientBackground {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-        ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "AuraFit Blueprint",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = AuraNeonCyan,
-                        letterSpacing = 1.5.sp
-                    )
-                    Text(
-                        text = "Welcome, ${profile?.name ?: "Athlete"}",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = FrostWhite
-                    )
-
-                    val curStreakVal = streak?.currentStreak ?: 0
-                    var selectedFlair by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("Lurking Aspirant") }
-                    val unlockedFlares = remember(curStreakVal) {
-                        mutableListOf("Lurking Aspirant").apply {
-                            if (curStreakVal >= 1) add("🥉 Novice Recruit")
-                            if (curStreakVal >= 3) add("🥈 Discipline Champion")
-                            if (curStreakVal >= 7) add("🥇 Cyan Flame Sentinel")
-                            if (curStreakVal >= 15) add("💎 Emerald Kinetic")
-                            if (curStreakVal >= 30) add("🌌 Cosmic Overlord")
-                        }
-                    }
-                    if (selectedFlair !in unlockedFlares) {
-                        selectedFlair = unlockedFlares.last()
-                    }
-
-                    val flairColor = when (selectedFlair) {
-                        "🥉 Novice Recruit" -> Color(0xFFCD7F32)
-                        "🥈 Discipline Champion" -> Color(0xFFC0A0FC)
-                        "🥇 Cyan Flame Sentinel" -> AuraNeonCyan
-                        "💎 Emerald Kinetic" -> AuraActiveEmerald
-                        "🌌 Cosmic Overlord" -> AuraAestheticPurple
-                        else -> FrostWhite.copy(alpha = 0.5f)
-                    }
-                    
+                Button(
+                    onClick = { viewModel.triggerGoogleSSO("sso.athlete@ulpifit.com") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.03f), contentColor = Color.White),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Row(
-                        modifier = Modifier
-                            .padding(top = 4.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(flairColor.copy(alpha = 0.12f))
-                            .border(1.dp, flairColor.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                            .clickable {
-                                val currentIdx = unlockedFlares.indexOf(selectedFlair)
-                                val nextIdx = (currentIdx + 1) % unlockedFlares.size
-                                selectedFlair = unlockedFlares[nextIdx]
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Default.WorkspacePremium,
+                            imageVector = Icons.Default.Security,
                             contentDescription = null,
-                            tint = flairColor,
-                            modifier = Modifier.size(14.dp)
+                            tint = AuraNeonCyan,
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = selectedFlair,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = flairColor
-                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Continue with Google", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                     }
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    IconButton(
-                        onClick = { viewModel.currentRoute.value = "notifications" },
-                        modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.10f), CircleShape)
-                            .border(1.dp, Color.White.copy(alpha = 0.20f), CircleShape)
-                            .size(44.dp)
-                    ) {
-                        Icon(Icons.Default.Notifications, "Inboxes", tint = AuraNeonCyan)
-                    }
-
-                    // Frosted Glass Premium Gradient Initial Avatar from CSS Template
-                    val nameInitial = (profile?.name ?: "Athlete").first().uppercaseChar().toString()
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .border(width = 2.dp, color = Color.White.copy(alpha = 0.20f), shape = RoundedCornerShape(14.dp))
-                            .padding(2.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(Color(0xFF6366F1), Color(0xFFFB7185)) // Tailwind from-indigo-500 to-rose-400
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = nameInitial,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Black,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Scrollable Content
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                // STREAK CORNER CARD with live 24h integrity countdown
-                item {
-                    val activeStreakVal = streak?.currentStreak ?: 0
-                    val recordsVal = streak?.longestStreak ?: 0
-                    val lastDate = streak?.lastCompletedWorkoutDate
-
-                    val todayStr = viewModel.getTodayString()
-                    var timeRemainingStr by remember { mutableStateOf("23:59:59") }
-                    var progressFraction by remember { mutableStateOf(1.0f) }
-
-                    LaunchedEffect(lastDate) {
-                        while (true) {
-                            val now = Calendar.getInstance()
-                            val target = Calendar.getInstance()
-                            
-                            if (lastDate == todayStr) {
-                                // Workout already completed today! Secure deadline is midnight of tomorrow
-                                target.add(Calendar.DAY_OF_YEAR, 1)
-                            }
-                            // Set deadline to end of that target day (23:59:59)
-                            target.set(Calendar.HOUR_OF_DAY, 23)
-                            target.set(Calendar.MINUTE, 59)
-                            target.set(Calendar.SECOND, 59)
-                            target.set(Calendar.MILLISECOND, 999)
-
-                            val diff = target.timeInMillis - now.timeInMillis
-                            if (diff > 0) {
-                                val hours = diff / (1000 * 60 * 60)
-                                val minutes = (diff / (1000 * 60)) % 60
-                                val seconds = (diff / 1000) % 60
-                                timeRemainingStr = String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
-                                
-                                val totalDaySecs = 86400f
-                                val remainingDaySecs = diff / 1000f
-                                progressFraction = (remainingDaySecs / totalDaySecs).coerceIn(0f, 1f)
-                            } else {
-                                timeRemainingStr = "00:00:00"
-                                progressFraction = 0.0f
-                            }
-                            delay(1000)
-                        }
-                    }
-
-                    AuraGlassCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1.2f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.LocalFireDepartment,
-                                        contentDescription = "streak",
-                                        tint = if (lastDate == todayStr) AuraActiveEmerald else AuraAccentCoral,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Text(
-                                        text = "$activeStreakVal Day Streak",
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = FrostWhite,
-                                        modifier = Modifier.padding(start = 4.dp).testTag("streak_headline")
-                                    )
-                                }
-
-                                Text(
-                                    text = "Personal Best: $recordsVal days",
-                                    fontSize = 12.sp,
-                                    color = FrostWhite.copy(alpha = 0.6f),
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-
-                                Spacer(modifier = Modifier.height(10.dp))
-
-                                // Real Streak Rule checklist indicator
-                                Text(
-                                    text = if (lastDate == todayStr) 
-                                        "Saved Today! Streak insulated." 
-                                    else "Complete a workout today to preserve your streak!",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (lastDate == todayStr) AuraActiveEmerald else AuraAccentCoral
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                // Weekly visual streak row matching Frosted Glass CSS template
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    val days = listOf("S", "M", "T", "W", "T", "F", "S")
-                                    val completedDays = listOf(true, true, true, false, false, false, false)
-                                    days.forEachIndexed { index, day ->
-                                        Box(
-                                            modifier = Modifier
-                                                .size(24.dp)
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(
-                                                    if (completedDays[index]) AuraNeonCyan.copy(alpha = 0.85f)
-                                                    else Color.White.copy(alpha = 0.10f)
-                                                ),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = day,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (completedDays[index]) ObsidianBlack else FrostWhite.copy(alpha = 0.4f)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Dynamic hours countdown graphics representation (iOS glassmorphism details)
-                            Box(
-                                modifier = Modifier
-                                    .size(90.dp)
-                                    .background(
-                                        Brush.radialGradient(
-                                            colors = listOf((if (lastDate == todayStr) AuraActiveEmerald else AuraNeonCyan).copy(alpha = 0.15f), Color.Transparent)
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    progress = progressFraction,
-                                    color = if (lastDate == todayStr) AuraActiveEmerald else AuraAccentCoral,
-                                    trackColor = FrostWhite.copy(alpha = 0.08f),
-                                    strokeWidth = 6.dp,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(
-                                        text = timeRemainingStr,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (lastDate == todayStr) AuraActiveEmerald else AuraAccentCoral,
-                                        modifier = Modifier.testTag("streak_timer_clock")
-                                    )
-                                    Text(
-                                        text = if (lastDate == todayStr) "SECURED" else "WINDOW",
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = FrostWhite.copy(alpha = 0.5f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // DISCIPLINE BADGES & REWARDS Section
-                item {
-                    val curStreak = streak?.currentStreak ?: 0
-                    var selectedBadgeDesc by remember { mutableStateOf<String?>(null) }
-                    var selectedBadgeName by remember { mutableStateOf<String?>(null) }
-
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 8.dp)
-                            .border(1.dp, FrostWhite.copy(alpha = 0.05f), RoundedCornerShape(20.dp)),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = CosmicSlate.copy(alpha = 0.2f))
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "Discipline Badges & Ranks",
-                                color = FrostWhite,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Build streaks to unlock cosmetic ranks and aura power.",
-                                color = FrostWhite.copy(alpha = 0.5f),
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(bottom = 12.dp)
-                            )
-
-                            val badgeList = listOf(
-                                Triple("Bronze Spark", "🥉", 1),
-                                Triple("Discipline Shield", "🥈", 3),
-                                Triple("Cyan Flame Sentinel", "🔥", 7),
-                                Triple("Emerald Kinetic", "⚡", 15),
-                                Triple("Cosmic Overlord", "🌌", 30)
-                            )
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                badgeList.forEach { (bName, bIcon, bMin) ->
-                                    val isUnlocked = curStreak >= bMin
-                                    val badgeColor = when (bMin) {
-                                        1 -> Color(0xFFCD7F32)
-                                        3 -> Color(0xFFC0A0FC)
-                                        7 -> AuraNeonCyan
-                                        15 -> AuraActiveEmerald
-                                        else -> AuraAestheticPurple
-                                    }
-
-                                    Box(
-                                        modifier = Modifier
-                                            .size(54.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isUnlocked) badgeColor.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
-                                            .border(
-                                                width = 1.5.dp,
-                                                color = if (isUnlocked) badgeColor else FrostWhite.copy(alpha = 0.1f),
-                                                shape = CircleShape
-                                            )
-                                            .clickable {
-                                                selectedBadgeName = bName
-                                                selectedBadgeDesc = if (isUnlocked) {
-                                                    "Unlocked! You secured a $bMin+ day streak to claim this level. Click flair to equip cosmetic rank representation."
-                                                } else {
-                                                    "Locked. Build a workout streak of at least $bMin days to claim this reward item."
-                                                }
-                                            },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = bIcon,
-                                            fontSize = 24.sp,
-                                            modifier = Modifier.align(Alignment.Center)
-                                        )
-                                        if (!isUnlocked) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .background(Color.Black.copy(alpha = 0.5f), CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Lock,
-                                                    contentDescription = null,
-                                                    tint = FrostWhite.copy(alpha = 0.6f),
-                                                    modifier = Modifier.size(12.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Dynamic Badge Expansion details card with smooth Compose AnimatedVisibility details
-                            AnimatedVisibility(
-                                visible = selectedBadgeDesc != null,
-                                enter = expandVertically() + fadeIn(),
-                                exit = shrinkVertically() + fadeOut()
-                            ) {
-                                if (selectedBadgeName != null && selectedBadgeDesc != null) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 12.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(Color.White.copy(alpha = 0.05f))
-                                            .border(0.8.dp, AuraNeonCyan.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                                            .padding(12.dp)
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = selectedBadgeName!!,
-                                                color = AuraNeonCyan,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 13.sp
-                                            )
-                                            IconButton(
-                                                onClick = {
-                                                    selectedBadgeDesc = null
-                                                    selectedBadgeName = null
-                                                },
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Icon(Icons.Default.Close, null, tint = FrostWhite.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
-                                            }
-                                        }
-                                        Text(
-                                            text = selectedBadgeDesc!!,
-                                            color = FrostWhite.copy(alpha = 0.8f),
-                                            fontSize = 12.sp,
-                                            modifier = Modifier.padding(top = 4.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // CUMULATIVE PHYSICAL STATS GRID
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        // Total Exercises
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color.White.copy(alpha = 0.10f))
-                                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(24.dp))
-                                .padding(14.dp)
-                        ) {
-                            Column {
-                                Icon(Icons.Default.CheckCircle, null, tint = AuraNeonCyan, modifier = Modifier.size(20.dp))
-                                Text("$count Sessions", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite, modifier = Modifier.padding(top = 8.dp))
-                                Text("Total Done", fontSize = 11.sp, color = FrostWhite.copy(alpha = 0.5f))
-                            }
-                        }
-
-                        // Burn Estimation
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color.White.copy(alpha = 0.10f))
-                                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(24.dp))
-                                .padding(14.dp)
-                        ) {
-                            Column {
-                                Icon(Icons.Default.Whatshot, null, tint = AuraAccentCoral, modifier = Modifier.size(20.dp))
-                                Text("$calories kcal", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite, modifier = Modifier.padding(top = 8.dp))
-                                Text("Aura Burned", fontSize = 11.sp, color = FrostWhite.copy(alpha = 0.5f))
-                            }
-                        }
-
-                        // Minutes Worked
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(Color.White.copy(alpha = 0.10f))
-                                .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(24.dp))
-                                .padding(14.dp)
-                        ) {
-                            Column {
-                                Icon(Icons.Default.HourglassEmpty, null, tint = AuraAestheticPurple, modifier = Modifier.size(20.dp))
-                                Text("$minutes mins", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite, modifier = Modifier.padding(top = 8.dp))
-                                Text("Active Time", fontSize = 11.sp, color = FrostWhite.copy(alpha = 0.5f))
-                            }
-                        }
-                    }
-                }
-
-                // ACTION: TRIGGER RANDOM DEV MOTIVATION INBOX PUSH
-                item {
-                    AuraFloatingCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(2f)) {
-                                Icon(Icons.Default.WorkspacePremium, "shield", tint = AuraNeonCyan, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text("Dynamic Mental Spark", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                                    Text("Inject a fresh reminder into your feed.", fontSize = 12.sp, color = FrostWhite.copy(alpha = 0.6f))
-                                }
-                            }
-                            Button(
-                                onClick = { viewModel.logMotivationalQuotePush() },
-                                colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Text("Spark", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-
-                // DYNAMIC WORKOUT PLAN PRESET LIST BASED ON ONBOARDING
-                item {
-                    Text(
-                        text = "Your Recommended Daily Plan",
-                        color = FrostWhite,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 8.dp)
-                    )
-                }
-
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 6.dp)
-                            .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(24.dp)),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.08f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                text = "Blueprint Code: ${profile?.experienceLevel ?: "Standard"} ${profile?.fitnessGoal ?: "Athleticism"}",
-                                color = AuraNeonCyan,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Consists of ${recommendedExercises.size} custom calibrated movements.",
-                                color = FrostWhite,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-
-                            // Quick Horizontal Exercise List Preview
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                recommendedExercises.forEach { item ->
-                                    Box(
-                                        modifier = Modifier
-                                            .background(ObsidianBlack.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(item.name, color = FrostWhite, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                                    }
-                                }
-                            }
-
-                            // LAUNCH BUTTON
-                            Button(
-                                onClick = {
-                                    viewModel.launchWorkoutSession(
-                                        name = "Daily Blueprint ${profile?.fitnessGoal ?: "Core"}",
-                                        category = "Mixed Plan",
-                                        exercises = recommendedExercises
-                                    )
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 8.dp)
-                                    .testTag("dashboard_start_workout_button"),
-                                colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.PlayArrow, null, tint = ObsidianBlack)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Begin Prescribed Workout", fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // MANUAL CATEGORY TRIGGER PLANS
-                item {
-                    Text(
-                        text = "Alternative Calibration Drills",
-                        color = FrostWhite,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 24.dp, top = 16.dp, bottom = 8.dp)
-                    )
-                }
-
-                val customPacks = listOf(
-                    Triple("Full Sculpt Cardio Cardio", "Cardio Blast (Beginner)", WorkoutPreset.exercises.filter { it.category == "Cardio" && it.level == "Beginner" }),
-                    Triple("Peak Strength Force", "Strength Shred (Advanced)", WorkoutPreset.exercises.filter { it.category == "Strength" && it.level == "Advanced" }),
-                    Triple("Recovery Stretching Static", "Pliable Recovery (Body Stretch)", WorkoutPreset.exercises.filter { it.category == "Stretching" })
-                )
-
-                items(customPacks) { pack ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 4.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(CosmicSlate.copy(alpha = 0.3f))
-                            .clickable {
-                                viewModel.launchWorkoutSession(
-                                    name = pack.second,
-                                    category = "Manual Selection",
-                                    exercises = pack.third
-                                )
-                            }
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(pack.second, color = FrostWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text("${pack.third.size} Exercises • Totaling ~${pack.third.sumOf { it.durationSeconds } / 60} minutes", color = FrostWhite.copy(alpha = 0.5f), fontSize = 11.sp)
-                        }
-                        Icon(Icons.Default.ArrowForwardIos, null, tint = AuraNeonCyan, modifier = Modifier.size(16.dp))
-                    }
-                }
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
     }
 }
 
 // ==========================================
-// 5. WORKOUT TIMER SCREEN ROUTE
+// 3. STEP-BY-STEP ONBOARDING WIZARD (Image 7 & 11)
 // ==========================================
 
 @Composable
-fun WorkoutTimerScreen(viewModel: AuraViewModel) {
-    val workoutName by viewModel.activeWorkoutName.collectAsStateWithLifecycle()
-    val list by viewModel.activeExercisesList.collectAsStateWithLifecycle()
-    val index by viewModel.currentExerciseIndex.collectAsStateWithLifecycle()
-    
-    val timerLeft by viewModel.timerSecondsLeft.collectAsStateWithLifecycle()
-    val isPaused by viewModel.isTimerPaused.collectAsStateWithLifecycle()
-    val isResting by viewModel.isRestingState.collectAsStateWithLifecycle()
-    val restLeft by viewModel.restSecondsLeft.collectAsStateWithLifecycle()
-    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
+fun OnboardingScreen(viewModel: AuraViewModel) {
+    var step by remember { mutableStateOf(1) } // 1 to 6 steps
 
-    val currentExercise = list.getOrNull(index)
+    val name by viewModel.onboardName.collectAsStateWithLifecycle()
+    val age by viewModel.onboardAge.collectAsStateWithLifecycle()
+    val gender by viewModel.onboardGender.collectAsStateWithLifecycle()
+    val height by viewModel.onboardHeight.collectAsStateWithLifecycle()
+    val weight by viewModel.onboardWeight.collectAsStateWithLifecycle()
+    val goal by viewModel.onboardGoal.collectAsStateWithLifecycle()
+    val error by viewModel.onboardingError.collectAsStateWithLifecycle()
 
     AuraGradientBackground {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(20.dp)
+                .padding(24.dp)
                 .safeDrawingPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Screen Top Header info
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = workoutName.uppercase(Locale.US),
-                    fontSize = 12.sp,
-                    color = AuraNeonCyan,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.sp
-                )
-                Text(
-                    text = if (isResting) "CATCH YOUR BREATH" else "EXERCISE ${index + 1} OF ${list.size}",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                    color = FrostWhite,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
-            // 120fps Smooth Procedural Skeleton Joint Model Visualization Card
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            ) {
-                ExerciseVisualizer(
-                    exerciseName = currentExercise?.name ?: "",
-                    isResting = isResting,
-                    gender = profile?.gender ?: "Male",
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // High Fidelity Timer progress + Active movement specs
-            val activeTargetSec = if (isResting) 15 else (currentExercise?.durationSeconds ?: 45)
-            val activeLeft = if (isResting) restLeft else timerLeft
-            val ratio = activeLeft.toFloat() / activeTargetSec.toFloat()
-
-            AuraGlassCard(
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            // Assessment Progress Indicators
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Circle Timer ring!
-                    Box(
-                        modifier = Modifier.size(110.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            progress = { ratio.coerceIn(0.0f, 1.0f) },
-                            color = if (isResting) AuraAestheticPurple else AuraNeonCyan,
-                            trackColor = FrostWhite.copy(alpha = 0.08f),
-                            strokeWidth = 8.dp,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = if (isResting) "REST" else "TIMER",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = FrostWhite.copy(alpha = 0.5f)
-                            )
-                            Text(
-                                text = String.format(Locale.US, "%02d:%02d", activeLeft / 60, activeLeft % 60),
-                                fontSize = 24.sp,
-                                fontWeight = FontWeight.Black,
-                                color = FrostWhite,
-                                modifier = Modifier.testTag("workout_timer_clock")
-                            )
-                        }
-                    }
-                    
-                    // Exercise description box or current/next details!
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 16.dp),
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        if (isResting) {
-                            val nextEx = list.getOrNull(index)
-                            Text(
-                                text = "PREPARING FOR:",
-                                color = AuraAestheticPurple,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = nextEx?.name ?: "",
-                                color = FrostWhite,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = nextEx?.targetMuscles ?: "",
-                                color = AuraNeonCyan,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        } else {
-                            Text(
-                                text = "ACTIVE MOVEMENT:",
-                                color = AuraNeonCyan,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = currentExercise?.name ?: "",
-                                color = FrostWhite,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1
-                            )
-                            Text(
-                                text = currentExercise?.targetMuscles ?: "",
-                                color = AuraNeonCyan,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = currentExercise?.description ?: "",
-                                color = FrostWhite.copy(alpha = 0.6f),
-                                fontSize = 11.sp,
-                                maxLines = 2,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // CONTROLS BOX (Pause, skip, Exit / Abort)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Premature Exit
-                IconButton(
-                    onClick = { viewModel.exitActiveWorkoutPrematurely() },
-                    modifier = Modifier
-                        .size(54.dp)
-                        .background(FrostWhite.copy(alpha = 0.1f), CircleShape)
-                ) {
-                    Icon(Icons.Default.Close, "abort", tint = AuraAccentCoral)
-                }
-
-                // Play / Pause Float card
-                IconButton(
-                    onClick = { viewModel.pauseResumeWorkoutTimer() },
-                    modifier = Modifier
-                        .size(70.dp)
-                        .background(if (isPaused) AuraActiveEmerald else AuraNeonCyan, CircleShape)
-                        .testTag("workout_play_pause_button")
-                ) {
-                    Icon(
-                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        contentDescription = "playpause",
-                        tint = ObsidianBlack,
-                        modifier = Modifier.size(36.dp)
+                    Text(
+                        text = "ATHLETE ASSESSMENT",
+                        color = AuraNeonCyan,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.5.sp
+                    )
+                    Text(
+                        text = "$step of 6",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
-                // Skip exercise
-                IconButton(
-                    onClick = { viewModel.skipCurrentExercise() },
-                    modifier = Modifier
-                        .size(54.dp)
-                        .background(FrostWhite.copy(alpha = 0.1f), CircleShape)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Graphical progress bar dividers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(Icons.Default.ArrowForward, "skip", tint = FrostWhite)
-                }
-            }
-        }
-    }
-}
-
-// ==========================================
-// 6. HISTORIC LOGS LIST ROUTE
-// ==========================================
-
-@Composable
-fun WorkoutHistoryScreen(viewModel: AuraViewModel) {
-    val history by viewModel.completedHistory.collectAsStateWithLifecycle()
-
-    AuraGradientBackground {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .safeDrawingPadding()
-        ) {
-            Text(
-                text = "LOGS",
-                color = AuraNeonCyan,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-            Text(
-                text = "Discipline History",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = FrostWhite,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            if (history.isEmpty()) {
-                // Empty state to satisfy technical mandates
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.Inbox,
-                            contentDescription = null,
-                            tint = FrostWhite.copy(alpha = 0.2f),
-                            modifier = Modifier.size(72.dp)
-                        )
-                        Text(
-                            text = "No workouts recorded yet.",
-                            color = FrostWhite.copy(alpha = 0.4f),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(top = 10.dp)
-                        )
-                        Text(
-                            text = "Start and complete a daily blueprint plan!",
-                            color = AuraNeonCyan.copy(alpha = 0.5f),
-                            fontSize = 12.sp
+                    for (i in 1..6) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(
+                                    if (i <= step) AuraNeonCyan else Color.White.copy(alpha = 0.1f)
+                                )
                         )
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+            }
+
+            // Step Content Holder
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    items(history) { log ->
-                        val dateString = remember(log.completedAtTimestamp) {
-                            val sdf = SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
-                            sdf.format(Date(log.completedAtTimestamp))
+                    when (step) {
+                        1 -> {
+                            Text("What is your display name?", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { viewModel.onboardName.value = it },
+                                placeholder = { Text("E.g., Eren Jaeger", color = Color.White.copy(alpha = 0.3f)) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = AuraNeonCyan
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().testTag("onboard_name_field")
+                            )
                         }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(CosmicSlate.copy(alpha = 0.4f))
-                                .border(1.dp, FrostWhite.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(2f)) {
+                        2 -> {
+                            Text("Provide your age", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            OutlinedTextField(
+                                value = age,
+                                onValueChange = { viewModel.onboardAge.value = it },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, focusedBorderColor = AuraNeonCyan),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        3 -> {
+                            // What is your gender? (Image 7)
+                            Text("What is your gender?", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                // Male Selection Card
                                 Box(
                                     modifier = Modifier
-                                        .size(44.dp)
-                                        .background(AuraNeonCyan.copy(alpha = 0.1f), CircleShape),
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(if (gender == "Male") AuraNeonCyan.copy(alpha = 0.15f) else Color(0xFF0F1422))
+                                        .border(
+                                            2.dp,
+                                            if (gender == "Male") AuraNeonCyan else Color.White.copy(alpha = 0.05f),
+                                            RoundedCornerShape(18.dp)
+                                        )
+                                        .clickable { viewModel.onboardGender.value = "Male" }
+                                        .padding(24.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(Icons.Default.Done, null, tint = AuraNeonCyan)
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.Male, null, tint = if (gender == "Male") AuraNeonCyan else Color.White, modifier = Modifier.size(54.dp))
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text("Male", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
                                 }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                    Text(log.workoutName, color = FrostWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                                    Text(dateString, color = FrostWhite.copy(alpha = 0.4f), fontSize = 11.sp)
+
+                                // Female Selection Card
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(if (gender == "Female") AuraNeonCyan.copy(alpha = 0.15f) else Color(0xFF0F1422))
+                                        .border(
+                                            2.dp,
+                                            if (gender == "Female") AuraNeonCyan else Color.White.copy(alpha = 0.05f),
+                                            RoundedCornerShape(18.dp)
+                                        )
+                                        .clickable { viewModel.onboardGender.value = "Female" }
+                                        .padding(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.Female, null, tint = if (gender == "Female") AuraNeonCyan else Color.White, modifier = Modifier.size(54.dp))
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text("Female", color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
+                        }
 
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(
-                                    text = "+${log.caloriesBurned} kcal",
-                                    color = AuraAccentCoral,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "${log.durationSeconds / 60}m ${log.durationSeconds % 60}s",
-                                    color = FrostWhite.copy(alpha = 0.5f),
-                                    fontSize = 11.sp
-                                )
+                        4 -> {
+                            Text("What is your height in cm?", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            OutlinedTextField(
+                                value = height,
+                                onValueChange = { viewModel.onboardHeight.value = it },
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, focusedBorderColor = AuraNeonCyan),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        5 -> {
+                            Text("What is your body weight in kg?", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            OutlinedTextField(
+                                value = weight,
+                                onValueChange = { viewModel.onboardWeight.value = it },
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, focusedBorderColor = AuraNeonCyan),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+
+                        6 -> {
+                            // What is your fitness goal? (Image 11)
+                            Text("What is your fitness goal?", fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, textAlign = TextAlign.Center)
+                            Spacer(modifier = Modifier.height(18.dp))
+
+                            val goals = listOf(
+                                "Lose weight",
+                                "Try AI Coach",
+                                "Get bulks",
+                                "Gain endurance",
+                                "Trying out the app"
+                            )
+
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                items(goals) { choice ->
+                                    val isChosen = goal == choice
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(if (isChosen) AuraNeonCyan.copy(alpha = 0.15f) else Color(0xFF0F1422))
+                                            .border(
+                                                1.5.dp,
+                                                if (isChosen) AuraNeonCyan else Color.White.copy(alpha = 0.05f),
+                                                RoundedCornerShape(14.dp)
+                                            )
+                                            .clickable { viewModel.onboardGoal.value = choice }
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isChosen) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                            contentDescription = null,
+                                            tint = if (isChosen) AuraNeonCyan else Color.White.copy(alpha = 0.3f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(choice, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
+                                }
                             }
                         }
                     }
+
+                    if (error != null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(error ?: "", color = AuraAccentCoral, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+
+            // Bottom Nav Wizard CTAs
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                if (step > 1) {
+                    OutlinedButton(
+                        onClick = { step -= 1 },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(50.dp)
+                    ) {
+                        Text("Back", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        if (step < 6) {
+                            if (step == 1 && name.trim().isEmpty()) {
+                                viewModel.onboardingError.value = "Please enter your display name."
+                                return@Button
+                            }
+                            viewModel.onboardingError.value = null
+                            step += 1
+                        } else {
+                            viewModel.completeOnboardingSubmission()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(2f).height(50.dp).testTag("onboard_next_button")
+                ) {
+                    Text(
+                        text = if (step == 6) "Finish Assessment" else "Next Step",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
                 }
             }
         }
@@ -2160,28 +1044,43 @@ fun WorkoutHistoryScreen(viewModel: AuraViewModel) {
 }
 
 // ==========================================
-// 7. SECURE SETTINGS SCREEN ROUTE
+// 4. UNIFIED DASHBOARD WITH 4 BEAUTIFUL TABS
 // ==========================================
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: AuraViewModel) {
-    val activeEmailVal by viewModel.activeEmail.collectAsStateWithLifecycle()
-    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
-    val settings by viewModel.userSettings.collectAsStateWithLifecycle()
+fun DashboardScreen(viewModel: AuraViewModel) {
+    val activeTab by viewModel.activeDashboardTab.collectAsStateWithLifecycle()
 
-    var nameInput by remember { mutableStateOf("") }
-    var heightInput by remember { mutableStateOf("") }
-    var weightInput by remember { mutableStateOf("") }
-
-    // Synchronize inputs dynamically on load
-    LaunchedEffect(profile) {
-        if (profile != null) {
-            nameInput = profile!!.name
-            heightInput = profile!!.height.toInt().toString()
-            weightInput = profile!!.weight.toInt().toString()
+    AnimatedContent(
+        targetState = activeTab,
+        transitionSpec = {
+            if (targetState > initialState) {
+                (slideInHorizontally(animationSpec = tween(250)) { width -> width / 3 } + fadeIn(animationSpec = tween(220)))
+                    .togetherWith(slideOutHorizontally(animationSpec = tween(220)) { width -> -width / 3 } + fadeOut(animationSpec = tween(180)))
+            } else {
+                (slideInHorizontally(animationSpec = tween(250)) { width -> -width / 3 } + fadeIn(animationSpec = tween(220)))
+                    .togetherWith(slideOutHorizontally(animationSpec = tween(220)) { width -> width / 3 } + fadeOut(animationSpec = tween(180)))
+            }
+        },
+        label = "dashboard_tab_routing"
+    ) { targetTab ->
+        when (targetTab) {
+            0 -> TabHomeView(viewModel)
+            1 -> TabExploreView(viewModel)
+            2 -> TabProgramsView(viewModel)
+            3 -> TabProfileView(viewModel)
+            else -> TabHomeView(viewModel)
         }
     }
+}
+
+// === TAB 0 : HOME VIEW (Image 1 & Image 6) ===
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TabHomeView(viewModel: AuraViewModel) {
+    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
+    var searchMealInput by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("Vegetable") }
 
     AuraGradientBackground {
         Column(
@@ -2191,283 +1090,1347 @@ fun SettingsScreen(viewModel: AuraViewModel) {
                 .verticalScroll(rememberScrollState())
                 .safeDrawingPadding()
         ) {
-            Text(
-                text = "SYSTEM",
-                color = AuraNeonCyan,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp,
-                modifier = Modifier.padding(top = 16.dp)
-            )
-            Text(
-                text = "Control Center",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = FrostWhite,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // DUAL ENGINE SETTINGS CARD
-            AuraGlassCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Supabase Dual Sync Protocol", color = AuraNeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text("Status: ${if (SupabaseConfig.isConfigured) "SYNCED ACTIVE" else "OFFLINE LOCAL LOCK"}", color = FrostWhite, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
-                Text(
-                    text = "AuraFit is automatically saving to local Room tables. Setting up Supabase variables pushes real-time cloud schemas.",
-                    fontSize = 11.sp,
-                    color = FrostWhite.copy(alpha = 0.5f),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
             Spacer(modifier = Modifier.height(14.dp))
 
-            // PROFILE EDIT CARD Section
-            AuraGlassCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Edit Physical Dimensions", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = nameInput,
-                    onValueChange = { nameInput = it },
-                    label = { Text("Display Name") },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = FrostWhite, unfocusedTextColor = FrostWhite, focusedBorderColor = AuraNeonCyan),
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = heightInput,
-                        onValueChange = { heightInput = it },
-                        label = { Text("Height (cm)") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = FrostWhite, unfocusedTextColor = FrostWhite, focusedBorderColor = AuraNeonCyan),
-                        modifier = Modifier.weight(1f)
+            // Greeting & Search (Image 6)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Hello, ${profile?.name ?: "Athlete"}",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
                     )
-                    OutlinedTextField(
-                        value = weightInput,
-                        onValueChange = { weightInput = it },
-                        label = { Text("Weight (kg)") },
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = FrostWhite, unfocusedTextColor = FrostWhite, focusedBorderColor = AuraNeonCyan),
-                        modifier = Modifier.weight(1f)
+                    Text(
+                        text = "Looking for a healthy meal?",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.5f)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = {
-                        viewModel.updateOnboardStatsDirectly(nameInput, heightInput, weightInput)
-                    },
+                IconButton(
+                    onClick = { viewModel.currentRoute.value = "dashboard"; viewModel.activeDashboardTab.value = 1 }, // open AI Chat directly
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .testTag("settings_save_profile_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
-                    shape = RoundedCornerShape(10.dp)
+                        .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
                 ) {
-                    Text("Apply Dimensions", fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Face, null, tint = AuraNeonCyan)
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // PRESETS & CONFIGURATION TOGGLES Section
-            AuraGlassCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Operational Preferences", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                Spacer(modifier = Modifier.height(12.dp))
+            // Search Bar Input
+            OutlinedTextField(
+                value = searchMealInput,
+                onValueChange = { searchMealInput = it },
+                placeholder = { Text("Search meals or active recipes...", color = Color.White.copy(alpha = 0.3f)) },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.White.copy(alpha = 0.4f)) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = AuraNeonCyan,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                // Dark Theme toggle fallback
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Forced Dark Mode", color = FrostWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Frosted glass look requires dark overlay.", color = FrostWhite.copy(alpha = 0.4f), fontSize = 11.sp)
-                    }
-                    Switch(
-                        checked = settings?.isDarkMode ?: true,
-                        onCheckedChange = { viewModel.updateThemeToggle(it) },
-                        colors = SwitchDefaults.colors(checkedThumbColor = AuraNeonCyan)
-                    )
-                }
+            Spacer(modifier = Modifier.height(20.dp))
 
-                Divider(color = FrostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 10.dp))
+            // Categories Row (Image 6)
+            val categories = listOf(
+                "Vegetable" to Icons.Default.Agriculture,
+                "Beef/Meat" to Icons.Default.LocalPizza,
+                "Fruit" to Icons.Default.Icecream,
+                "Carbs" to Icons.Default.BreakfastDining
+            )
 
-                // Workout reminders
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Active Reminders", color = FrostWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Trigger daily consistency status.", color = FrostWhite.copy(alpha = 0.4f), fontSize = 11.sp)
-                    }
-                    Switch(
-                        checked = settings?.areRemindersEnabled ?: true,
-                        onCheckedChange = { viewModel.updateRemindersToggle(it) },
-                        colors = SwitchDefaults.colors(checkedThumbColor = AuraNeonCyan)
-                    )
-                }
-
-                Divider(color = FrostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 10.dp))
-
-                // Privacy lock
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Biometric Security Cover", color = FrostWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Require secure auth on every resume.", color = FrostWhite.copy(alpha = 0.4f), fontSize = 11.sp)
-                    }
-                    Switch(
-                        checked = settings?.isPrivacyEnabled ?: false,
-                        onCheckedChange = { viewModel.updatePrivacyToggle(it) },
-                        colors = SwitchDefaults.colors(checkedThumbColor = AuraNeonCyan)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Help Support Ticket Section
-            AuraGlassCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Discipline Helpline", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = FrostWhite)
-                Text("Experiencing fatigue, joint strain, or need plan modifications? Direct support is available 24/7.", fontSize = 12.sp, color = FrostWhite.copy(alpha = 0.6f), modifier = Modifier.padding(vertical = 4.dp))
-                OutlinedButton(
-                    onClick = {
-                        viewModel.triggerLogout() // Quick logout bypass
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp)
-                        .testTag("settings_logout_button"),
-                    border = BorderStroke(1.dp, AuraAccentCoral),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AuraAccentCoral)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ExitToApp, null, tint = AuraAccentCoral)
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(categories) { (name, icon) ->
+                    val isChosen = selectedCategory == name
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isChosen) AuraNeonCyan else Color.White.copy(alpha = 0.04f))
+                            .clickable { selectedCategory = name }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(icon, null, tint = if (isChosen) ObsidianBlack else Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Secure Account Log out")
+                        Text(name, color = if (isChosen) ObsidianBlack else Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(100.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Runner's Balanced Diet (Image 6)
+            Text("ACTIVE NUTRIENTS DIETS", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            AuraGlassCard {
+                Text("Runner's Balanced Recipe Diet", fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 16.sp)
+                Text("Provides high complex carbohydrates and lean proteins and fats designed for maximal cardiovascular replenishment.", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.padding(vertical = 6.dp))
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("CARBS", color = AuraNeonCyan, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                        LinearProgressIndicator(progress = 0.65f, color = AuraNeonCyan, trackColor = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(top = 4.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("PROTEIN", color = AuraAestheticPurple, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                        LinearProgressIndicator(progress = 0.45f, color = AuraAestheticPurple, trackColor = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(top = 4.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("FATS", color = AuraAccentCoral, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                        LinearProgressIndicator(progress = 0.25f, color = AuraAccentCoral, trackColor = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Week calendar (Image 1)
+            Text("COMPLIANCE PROTOCOL CALENDAR", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                val week = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                week.forEachIndexed { i, day ->
+                    val isToday = i == 2 // Mock wednesday
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isToday) AuraNeonCyan else Color.White.copy(alpha = 0.03f))
+                            .border(1.dp, if (isToday) AuraNeonCyan else Color.White.copy(alpha = 0.05f), RoundedCornerShape(10.dp))
+                            .padding(vertical = 10.dp, horizontal = 12.dp)
+                    ) {
+                        Text(day, color = if (isToday) ObsidianBlack else Color.White.copy(alpha = 0.4f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("${15 + i}", color = if (isToday) ObsidianBlack else Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // MOVE Category (Image 1)
+            Text("MOVE PROTOCOL", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            AuraGlassCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.OfflineBolt, null, tint = AuraNeonCyan, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Power Shred in Gym", fontWeight = FontWeight.ExtraBold, color = Color.White, fontSize = 16.sp)
+                        }
+                        Text("Strength Training • 45 min • 350 Kcal", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                    }
+
+                    Button(
+                        onClick = {
+                            // Find and trigger gym routine preset
+                            val drills = WorkoutPreset.exercises.filter { it.category == "Strength" }.take(6)
+                            viewModel.launchWorkoutSession("Power Shred Gym Classic", "Strength", drills)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Start", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Meal Plan Shopping list card (Image 1)
+            Text("MEAL PLANNING", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            AuraGlassCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.ShoppingBag, null, tint = AuraNeonCyan, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Active Shopping List", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("E.g., Chicken breast, spinach, avocados, sweet potato", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(110.dp))
         }
     }
 }
 
-// ==========================================
-// 8. NOTIFICATIONS INBOX ROUTE
-// ==========================================
-
+// === TAB 1 : MY AI CHATS (Image 17, Chat Stream Image 19) ===
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NotificationsScreen(viewModel: AuraViewModel) {
-    val inbox by viewModel.notificationLogs.collectAsStateWithLifecycle()
+fun TabExploreView(viewModel: AuraViewModel) {
+    var searchChatStr by remember { mutableStateOf("") }
+    var selectedMiniTab by remember { mutableStateOf("AI") } // AI, Archived, Deleted
+    var activeChatByTitle by remember { mutableStateOf<String?>(null) } // if not null, show Chat thread screen!
+
+    val chatsMessagesFlow by viewModel.chatMessages.collectAsStateWithLifecycle()
+    val isAiLoading by viewModel.isAiLoading.collectAsStateWithLifecycle()
+    val isAiDemoMode by viewModel.isAiDemoMode.collectAsStateWithLifecycle()
+
+    var chatMessageInput by remember { mutableStateOf("") }
+
+    AuraGradientBackground {
+        if (activeChatByTitle != null) {
+            // Full Chat Stream screen representing Image 19
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+            ) {
+                // Chat Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { activeChatByTitle = null }) {
+                        Icon(Icons.Default.ArrowBack, null, tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(activeChatByTitle ?: "Uplift AI Coach", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Active Fitness assistant", color = AuraNeonCyan, fontSize = 11.sp)
+                    }
+                }
+
+                // Chat bubble timeline
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(chatsMessagesFlow) { (sender, text) ->
+                        val isAI = sender == "Ulpifit Assistant"
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = if (isAI) Arrangement.Start else Arrangement.End
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(
+                                        RoundedCornerShape(
+                                            topStart = 14.dp,
+                                            topEnd = 14.dp,
+                                            bottomStart = if (isAI) 2.dp else 14.dp,
+                                            bottomEnd = if (!isAI) 2.dp else 14.dp
+                                        )
+                                    )
+                                    .background(if (isAI) Color(0xFF131A2B) else AuraNeonCyan)
+                                    .border(1.dp, if (isAI) Color.White.copy(alpha = 0.05f) else Color.Transparent)
+                                    .padding(12.dp)
+                                    .widthIn(max = 280.dp)
+                            ) {
+                                Text(
+                                    text = text,
+                                    color = if (isAI) Color.White else ObsidianBlack,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
+                                )
+                            }
+                        }
+                    }
+
+                    if (isAiLoading) {
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                horizontalArrangement = Arrangement.Start
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(Color(0xFF131A2B))
+                                        .padding(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Uplift is analyzing...",
+                                        color = Color.White.copy(alpha = 0.5f),
+                                        fontSize = 13.sp,
+                                        style = androidx.compose.ui.text.TextStyle(
+                                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (isAiDemoMode) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(AuraAccentCoral.copy(alpha = 0.15f))
+                            .border(1.dp, AuraAccentCoral.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            text = "⚠️ Demo Mode Active: Showing custom offline sports responses. For unlimited live Gemini AI, set your GEMINI_API_KEY inside workspace secrets.",
+                            color = AuraAccentCoral,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                // Bottom Send area
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = chatMessageInput,
+                        onValueChange = { chatMessageInput = it },
+                        placeholder = { Text("Ask anything about workouts...", color = Color.White.copy(alpha = 0.3f)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = AuraNeonCyan
+                        ),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(24.dp)
+                    )
+                    IconButton(
+                        onClick = {
+                            if (chatMessageInput.trim().isNotEmpty()) {
+                                val query = chatMessageInput
+                                chatMessageInput = ""
+                                viewModel.sendChatMessage(query)
+                            }
+                        },
+                        modifier = Modifier.background(AuraNeonCyan, CircleShape)
+                    ) {
+                        Icon(Icons.Default.Send, null, tint = ObsidianBlack)
+                    }
+                }
+            }
+        } else {
+            // Chat Lists index screen representing Image 17
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp)
+                    .safeDrawingPadding()
+            ) {
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text("EXPLORE INTELLIGENCE", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                Text("My AI Chats", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Search Chat Input
+                OutlinedTextField(
+                    value = searchChatStr,
+                    onValueChange = { searchChatStr = it },
+                    placeholder = { Text("Search instructions...", color = Color.White.copy(alpha = 0.3f)) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.White.copy(alpha = 0.4f)) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = AuraNeonCyan
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Chat Lists SubTabs: AI, Archived, Deleted (Image 17)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    val subtabs = listOf("AI", "Archived", "Deleted")
+                    subtabs.forEach { text ->
+                        val active = selectedMiniTab == text
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (active) AuraNeonCyan else Color.White.copy(alpha = 0.02f))
+                                .border(1.dp, if (active) AuraNeonCyan else Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                .clickable { selectedMiniTab = text }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text, color = if (active) ObsidianBlack else Color.White.copy(alpha = 0.6f), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Interactive Chats items array matching picture titles exactly
+                val queriesList = listOf(
+                    "How to bulk faster?" to "Sure, let's talk about calorie surplus...",
+                    "Optimal Fitness Score" to "Your current fitness score is...",
+                    "How much water daily?" to "Typically 2000ml but based on...",
+                    "Gaining muscle fast" to "We can set you up with the Strength...",
+                    "Nutrition upgrade" to "Eat more rich vegetables and carbs...",
+                    "Fitness data ready" to "Awesome! Let's check status..."
+                ).filter {
+                    it.first.lowercase(Locale.US).contains(searchChatStr.lowercase(Locale.US))
+                }
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    items(queriesList) { (title, subtitle) ->
+                        AuraGlassCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { 
+                                activeChatByTitle = title 
+                                viewModel.selectActiveChat(title)
+                            }
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(42.dp)
+                                        .background(Color(0xFF1B2233), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.ChatBubble, null, tint = AuraNeonCyan, modifier = Modifier.size(18.dp))
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(subtitle, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(100.dp))
+            }
+        }
+    }
+}
+
+// === TAB 2 : PROGRAMS & PRESET WORKOUT PLANS (Image 20, Preset List Image 21, Plan Detail Image 22) ===
+@Composable
+fun TabProgramsView(viewModel: AuraViewModel) {
+    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
+    var selectedPlanToView by remember { mutableStateOf<String?>(null) } // Show full exercise details page (Image 22)
+
+    AuraGradientBackground {
+        AnimatedContent(
+            targetState = selectedPlanToView,
+            transitionSpec = {
+                if (targetState != null) {
+                    (slideInVertically(animationSpec = tween(300)) { height -> height / 2 } + fadeIn(animationSpec = tween(280)))
+                        .togetherWith(fadeOut(animationSpec = tween(180)))
+                } else {
+                    fadeIn(animationSpec = tween(200)) togetherWith (slideOutVertically(animationSpec = tween(300)) { height -> height / 2 } + fadeOut(animationSpec = tween(200)))
+                }
+            },
+            label = "program_details_transition"
+        ) { activePlan ->
+            if (activePlan != null) {
+                // Full Back Workout Details Screen (Image 22)
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .safeDrawingPadding()
+                ) {
+                    // Large picture header replacement
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(AuraAestheticPurple.copy(alpha = 0.4f), Color(0xFF04060A))
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            IconButton(onClick = { selectedPlanToView = null }) {
+                                Icon(Icons.Default.ArrowBack, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                            }
+                            Text("Back Workout Plan", color = Color.White, fontWeight = FontWeight.Black, fontSize = 28.sp)
+                            Text("V-taped Hypertrophy Program", color = AuraNeonCyan, fontSize = 12.sp)
+                        }
+                    }
+
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        // Plan parameters row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            listOf(
+                                "58 min" to Icons.Default.Timeline,
+                                "254 kcal" to Icons.Default.LocalFireDepartment,
+                                "3-4 Sets" to Icons.Default.FitnessCenter
+                            ).forEach { (desc, icon) ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color.White.copy(alpha = 0.05f))
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(icon, null, tint = AuraNeonCyan, modifier = Modifier.size(13.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(desc, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text("Description", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(
+                            "This back training focus builds a strong and wide V-taper. Make sure to perform slow negatives on pull-ups and lat pulldowns for maximum hypertrophy and athletic performance.",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 12.sp,
+                            lineHeight = 18.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Drill list matching Image 22 list item styling with expandability
+                        var expandedDrillIndex by remember { mutableStateOf<Int?>(null) }
+
+                        Text("TRAINING DRILLS (Tap to view visual guides)", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        val drills = listOf(
+                            "Wide-Grip Pull-ups" to "3 Sets x 8-10 reps safely",
+                            "Cable Lat Pulldown" to "4 Sets x 12 reps slow pull",
+                            "Seated Cable row" to "3 Sets x 12 reps control",
+                            "Barbell Deadlift" to "3 Sets x 5 reps power hold",
+                            "Child's pose recovery" to "90 seconds complete stretch"
+                        )
+
+                        drills.forEachIndexed { i, (name, reps) ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { expandedDrillIndex = if (expandedDrillIndex == i) null else i }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .background(AuraNeonCyan.copy(alpha = 0.15f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("${i + 1}", color = AuraNeonCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Text(reps, color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                                    }
+                                    Icon(
+                                        imageVector = if (expandedDrillIndex == i) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = "Expand drill visualizer details",
+                                        tint = AuraNeonCyan,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+
+                                AnimatedVisibility(
+                                    visible = expandedDrillIndex == i,
+                                    enter = expandVertically() + fadeIn(),
+                                    exit = shrinkVertically() + fadeOut()
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 12.dp)
+                                            .height(115.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        // Left: Dynamic coaching joint skeleton animation
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(Color.White.copy(alpha = 0.03f))
+                                        ) {
+                                            ExerciseVisualizer(
+                                                exerciseName = name,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        }
+
+                                        // Right: Photographic demonstration of the same movement
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(12.dp))
+                                        ) {
+                                            AsyncImage(
+                                                model = getExerciseDemonstrationUrl(name, "Strength"),
+                                                contentDescription = "Photo demonstration wrapper",
+                                                modifier = Modifier.fillMaxSize(),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Launch layout CTA
+                        Button(
+                            onClick = {
+                                selectedPlanToView = null
+                                val exercises = WorkoutPreset.exercises.filter { it.category == "Strength" }.take(5)
+                                viewModel.launchWorkoutSession("Back V-Taper Blueprint", "Strength", exercises)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(50.dp)
+                        ) {
+                            Text("Start Workout Plan", fontWeight = FontWeight.Bold)
+                        }
+
+                        Spacer(modifier = Modifier.height(60.dp))
+                    }
+                }
+            } else {
+                // Programs Main Feed Screen representing Image 20 & 21
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp)
+                        .verticalScroll(rememberScrollState())
+                        .safeDrawingPadding()
+                ) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text("TRAINING PROGRAMS", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Text("Strength & Training Table", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Personalized training banner card (Image 20 visual clone)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(Color(0xFF0F1524), Color(0xFF1B112D))
+                                )
+                            )
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(18.dp))
+                            .padding(20.dp)
+                    ) {
+                        Column {
+                            Text("Personalized Workout & Training", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
+                            Text("Tailored exercises for your strength level. Build absolute compliance and form.", fontSize = 11.sp, color = FrostWhite.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 4.dp))
+                            
+                            Spacer(modifier = Modifier.height(14.dp))
+                            
+                            Button(
+                                onClick = { selectedPlanToView = "Back Workout" },
+                                colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Browse Workouts", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    // Workout presets list with circular completion indicators (Image 21 style)
+                    Text("ALL PLANS", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val mockPlans = listOf(
+                        "Back Workout Plan" to "5 exercises • 58 min • 254 kcal",
+                        "Chest Shredder Plan" to "6 exercises • 45 min • 310 kcal",
+                        "Cardio Blaze Protocol" to "7 exercises • 30 min • 420 kcal",
+                        "Leg Power Day Plan" to "5 exercises • 50 min • 280 kcal"
+                    )
+
+                    mockPlans.forEachIndexed { idx, (planName, metrics) ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(16.dp))
+                                .clickable { selectedPlanToView = planName },
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0D121F))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Circular sets progress indicator (Image 21 visual representation)
+                                Box(
+                                    modifier = Modifier.size(44.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(
+                                        progress = 0.25f * (idx + 1),
+                                        color = AuraNeonCyan,
+                                        strokeWidth = 3.dp,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    Icon(Icons.Default.Adjust, null, tint = AuraNeonCyan.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                                }
+
+                                Spacer(modifier = Modifier.width(16.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(planName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                                    Text(metrics, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                                }
+
+                                IconButton(onClick = { selectedPlanToView = planName }) {
+                                    Icon(Icons.Default.ArrowForwardIos, null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(110.dp))
+                }
+            }
+        }
+    }
+}
+
+// === TAB 3 : PROFILE & METRICS PERFORMANCE (Image 12 & 13 & 14 & 15 & Settings 16 & Alerts 18) ===
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TabProfileView(viewModel: AuraViewModel) {
+    val profile by viewModel.activeProfile.collectAsStateWithLifecycle()
+    val totalWorkouts by viewModel.totalWorkoutsCompletedCount.collectAsStateWithLifecycle()
+    val caloriesBurnedByVM by viewModel.cumulativeCaloriesBurned.collectAsStateWithLifecycle()
+    val durationMinutes by viewModel.cumulativeDurationMinutes.collectAsStateWithLifecycle()
+    val userSettings by viewModel.userSettings.collectAsStateWithLifecycle()
+
+    var loggedCalorieInput by remember { mutableStateOf("") }
+    var currentHydrationMl by remember { mutableStateOf(500) } // tracking ml hydration (Image 12)
 
     AuraGradientBackground {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
+                .verticalScroll(rememberScrollState())
                 .safeDrawingPadding()
         ) {
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Upper profile info row
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(text = "ALERTS", color = AuraNeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    Text(text = "Discipline Inbox", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = FrostWhite)
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(AuraNeonCyan, AuraAestheticPurple))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = (profile?.name ?: "A").first().uppercase(),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 18.sp,
+                        color = ObsidianBlack
+                    )
                 }
-
-                TextButton(onClick = { viewModel.clearNotificationsList() }) {
-                    Text("Clear All", color = AuraNeonCyan, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.width(14.dp))
+                Column {
+                    Text(profile?.name ?: "Active Athlete", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+                    Text(profile?.email ?: "sso.athlete@ulpifit.com", color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp)
                 }
             }
 
-            if (inbox.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
+            Spacer(modifier = Modifier.height(18.dp))
+
+            // 1. Uplift Score Radar/Doughnut Card (Image 13 visual recreation)
+            Text("UPLIFT SPORT PERFORMANCE ASSESSMENT", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            AuraGlassCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.NotificationsNone, null, tint = FrostWhite.copy(alpha = 0.2f), modifier = Modifier.size(64.dp))
-                        Text("No active notifications.", color = FrostWhite.copy(alpha = 0.4f), fontSize = 14.sp, modifier = Modifier.padding(top = 8.dp))
+                    // Custom Doughnut drawing inside profile
+                    Box(
+                        modifier = Modifier
+                            .size(110.dp)
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            // Doughnut rings
+                            // Base gray
+                            drawCircle(color = Color.White.copy(alpha = 0.05f), style = Stroke(width = 8.dp.toPx()))
+                            // Strength
+                            drawArc(
+                                color = AuraNeonCyan,
+                                startAngle = -90f,
+                                sweepAngle = 210f,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                            // Agility
+                            drawArc(
+                                color = AuraAestheticPurple,
+                                startAngle = 120f,
+                                sweepAngle = 90f,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("84", fontSize = 28.sp, fontWeight = FontWeight.Black, color = Color.White)
+                            Text("Uplift", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(20.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).background(AuraNeonCyan, CircleShape))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Strength: 54%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).background(AuraAestheticPurple, CircleShape))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Agility: 26%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).background(AuraAccentCoral, CircleShape))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Endurance: 24%", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text("Your fitness score indicates high cardiorespiratory and muscle fiber compliance.", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 2. Calorie Intake Tracker & Chart (Image 14 & 15 visual recreation)
+            Text("CALORIE COMPLIANCE ENGINE", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            AuraGlassCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
-                    items(inbox) { item ->
-                        Row(
+                    Column {
+                        Text("1,745 Kcal Left", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        Text("Goal limit: 2000 calorie today", color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color.White.copy(alpha = 0.05f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("Eaten: 255 Kcal", color = AuraNeonCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Custom Canvas Bezier Intake Graph
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(70.dp)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val pts = listOf(10f, 25f, 15f, 44f, 28f, 60f, 50f)
+                        val stepX = size.width / (pts.size - 1)
+                        val scaleY = size.height / 80f
+                        
+                        // Vertical guideline grids
+                        pts.forEachIndexed { i, _ ->
+                            drawLine(color = Color.White.copy(alpha = 0.03f), start = Offset(i * stepX, 0f), end = Offset(i * stepX, size.height))
+                        }
+
+                        // Draw spline line
+                        for (i in 0 until pts.size - 1) {
+                            val startOpt = Offset(i * stepX, size.height - (pts[i] * scaleY))
+                            val endOpt = Offset((i + 1) * stepX, size.height - (pts[i+1] * scaleY))
+                            drawLine(
+                                color = AuraNeonCyan,
+                                start = startOpt,
+                                end = endOpt,
+                                strokeWidth = 3.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    listOf("M", "T", "W", "T", "F", "S", "S").forEach { day ->
+                        Text(day, color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Interaction: Quick add food calorie text area
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = loggedCalorieInput,
+                        onValueChange = { loggedCalorieInput = it },
+                        placeholder = { Text("Enter logged food kcal...", color = Color.White.copy(alpha = 0.3f)) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = AuraNeonCyan),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            val v = loggedCalorieInput.toIntOrNull()
+                            if (v != null) {
+                                // simulated success notification push
+                                loggedCalorieInput = ""
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AuraNeonCyan, contentColor = ObsidianBlack),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Add", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 3. Hydration Water Thermometer (Image 12 visual outline)
+            Text("HYDRATION CONTROL COMPLIANCE", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            AuraGlassCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Vertical Liquid water glass column
+                    Box(
+                        modifier = Modifier
+                            .width(50.dp)
+                            .height(130.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
+                            .border(1.5.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp)),
+                        contentAlignment = Alignment.BottomCenter
+                    ) {
+                        val fraction = currentHydrationMl.toFloat() / 2000f
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(CosmicSlate.copy(alpha = 0.5f))
-                                .border(
-                                    width = 1.dp,
-                                    color = when (item.type) {
-                                        "streak" -> AuraNeonCyan.copy(alpha = 0.2f)
-                                        "workout" -> AuraActiveEmerald.copy(alpha = 0.2f)
-                                        else -> AuraAestheticPurple.copy(alpha = 0.2f)
-                                    },
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .fillMaxHeight(fraction)
+                                .background(AuraNeonCyan)
+                        )
+                        Column(
+                            modifier = Modifier.padding(bottom = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(
-                                        when (item.type) {
-                                            "streak" -> AuraAccentCoral.copy(alpha = 0.15f)
-                                            "workout" -> AuraActiveEmerald.copy(alpha = 0.15f)
-                                            else -> AuraAestheticPurple.copy(alpha = 0.15f)
-                                        },
-                                        CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
+                            Text("${currentHydrationMl}ml", fontSize = 11.sp, fontWeight = FontWeight.Black, color = if (fraction > 0.3f) ObsidianBlack else Color.White)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(20.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Hydration Level Status", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+                        val remainingWater = (2000 - currentHydrationMl).coerceAtLeast(0)
+                        Text(
+                            text = if (remainingWater > 0) {
+                                "You need ${remainingWater}ml to reach daily goal today."
+                            } else {
+                                "Daily target is completed! Excellent discipline."
+                            },
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Quick water adder rows
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { currentHydrationMl = (currentHydrationMl + 250).coerceAtMost(2000) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
+                                shape = RoundedCornerShape(8.dp)
                             ) {
-                                Icon(
-                                    imageVector = when (item.type) {
-                                        "streak" -> Icons.Default.LocalFireDepartment
-                                        "workout" -> Icons.Default.DirectionsRun
-                                        else -> Icons.Default.Lightbulb
-                                    },
-                                    contentDescription = null,
-                                    tint = when (item.type) {
-                                        "streak" -> AuraAccentCoral
-                                        "workout" -> AuraActiveEmerald
-                                        else -> AuraAestheticPurple
-                                    },
-                                    modifier = Modifier.size(20.dp)
-                                )
+                                Text("+250ml", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
-
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(item.title, color = FrostWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(item.message, color = FrostWhite.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                            Button(
+                                onClick = { currentHydrationMl = (currentHydrationMl + 500).coerceAtMost(2000) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("+500ml", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 4. Account Settings (Image 16)
+            Text("ACCOUNT MANAGEMENT", color = AuraNeonCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            AuraGlassCard {
+                // Dark mode preference toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        viewModel.updateThemeToggle(!(userSettings?.isDarkMode ?: true))
+                    },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.DarkMode, null, tint = AuraNeonCyan, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Forced Dark Mode", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
+                    Switch(
+                        checked = userSettings?.isDarkMode ?: true,
+                        onCheckedChange = { viewModel.updateThemeToggle(it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = AuraNeonCyan)
+                    )
+                }
+
+                Divider(color = Color.White.copy(alpha = 0.04f), modifier = Modifier.padding(vertical = 12.dp))
+
+                // Custom logout bypass
+                OutlinedButton(
+                    onClick = { viewModel.triggerLogout() },
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = AuraAccentCoral),
+                    border = BorderStroke(1.dp, AuraAccentCoral.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().height(46.dp).testTag("settings_logout_button")
+                ) {
+                    Text("Secure Account Log Out", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(110.dp))
         }
     }
 }
+
+// ==========================================
+// 5. INTENSITY WORKOUT COUNTDOWN COUNTER (Image 23 Complete / running)
+// ==========================================
+
+@Composable
+fun WorkoutTimerScreen(viewModel: AuraViewModel) {
+    val activeWorkoutName by viewModel.activeWorkoutName.collectAsStateWithLifecycle()
+    val activeExercisesList by viewModel.activeExercisesList.collectAsStateWithLifecycle()
+    val currentExerciseIndex by viewModel.currentExerciseIndex.collectAsStateWithLifecycle()
+
+    val secondsLeft by viewModel.timerSecondsLeft.collectAsStateWithLifecycle()
+    val isPaused by viewModel.isTimerPaused.collectAsStateWithLifecycle()
+    val isResting by viewModel.isRestingState.collectAsStateWithLifecycle()
+    val restSecondsLeft by viewModel.restSecondsLeft.collectAsStateWithLifecycle()
+
+    val caloriesTrend by viewModel.liveEstimatedCaloriesBurned.collectAsStateWithLifecycle()
+    val workingSecsTotal by viewModel.liveWorkingSecondsCount.collectAsStateWithLifecycle()
+
+    val currentDrill = activeExercisesList.getOrNull(currentExerciseIndex)
+
+    AuraGradientBackground {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp)
+                .safeDrawingPadding(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Header Stats Area
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = activeWorkoutName.uppercase(Locale.US),
+                    color = AuraNeonCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.sp
+                )
+                Text(
+                    text = if (isResting) "Rest transition..." else (currentDrill?.name ?: "Prepare Drill"),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    modifier = Modifier.padding(top = 4.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            // Central Ring Counter drawing
+            Box(
+                modifier = Modifier
+                    .size(240.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF0F1524))
+                    .padding(14.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                // Progress radial sweep
+                val fraction = if (isResting) {
+                    if (restSecondsLeft > 0) restSecondsLeft.toFloat() / 15f else 0f
+                } else {
+                    val full = currentDrill?.durationSeconds ?: 45
+                    if (full > 0) secondsLeft.toFloat() / full.toFloat() else 0f
+                }
+
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawCircle(color = Color.White.copy(alpha = 0.05f), style = Stroke(width = 8.dp.toPx()))
+                    drawArc(
+                        color = if (isResting) AuraAestheticPurple else AuraNeonCyan,
+                        startAngle = -90f,
+                        sweepAngle = fraction * 360f,
+                        useCenter = false,
+                        style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (isResting) "$restSecondsLeft" else "$secondsLeft",
+                        fontSize = 58.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                    Text(
+                        text = if (isResting) "seconds rest" else "seconds remaining",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.4f)
+                    )
+                }
+            }
+
+            // Dynamic Skeletal Joint + demonstration picture Split Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(115.dp)
+                    .padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Left: Dynamic coaching joint skeleton animation
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Black.copy(alpha = 0.2f))
+                ) {
+                    ExerciseVisualizer(
+                        exerciseName = currentDrill?.name ?: "Workout",
+                        modifier = Modifier.fillMaxSize(),
+                        isResting = isResting
+                    )
+                }
+
+                // Right: Premium actual athlete photo demonstration
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(16.dp))
+                ) {
+                    AsyncImage(
+                        model = getExerciseDemonstrationUrl(currentDrill?.name ?: "", currentDrill?.category ?: "Strength"),
+                        contentDescription = "Physical Exercise Demo Image",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "PHOTO GUIDE",
+                            color = AuraNeonCyan,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // Realtime accumulator specs card
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(14.dp))
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceAround
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("WORKING DURATION", color = Color.White.copy(alpha = 0.4f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("${workingSecsTotal}s", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("BURNED CALORIES", color = AuraAccentCoral, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("${caloriesTrend.toInt()} kcal", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp))
+                }
+            }
+
+            // Command Control Button Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Premature exit button
+                OutlinedButton(
+                    onClick = { viewModel.exitActiveWorkoutPrematurely() },
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    modifier = Modifier.weight(1f).height(50.dp)
+                ) {
+                    Text("Exit Plan", fontWeight = FontWeight.Bold)
+                }
+
+                // Pause active control
+                Button(
+                    onClick = { viewModel.pauseResumeWorkoutTimer() },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isPaused) AuraNeonCyan else Color.White,
+                        contentColor = ObsidianBlack
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.weight(1.5f).height(50.dp)
+                ) {
+                    Text(
+                        text = if (isPaused) "Resume" else "Pause Drill",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Skip drill control
+                IconButton(
+                    onClick = { viewModel.skipCurrentExercise() },
+                    modifier = Modifier
+                        .size(50.dp)
+                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                ) {
+                    Icon(Icons.Default.SkipNext, "Skip next drill", tint = Color.White)
+                }
+            }
+        }
+    }
+}
+
+fun getExerciseDemonstrationUrl(name: String, category: String): String {
+    val clean = name.lowercase(java.util.Locale.US)
+    return when {
+        clean.contains("squat") -> 
+            "https://images.unsplash.com/photo-1574680096145-d05b474e2155?q=80&w=500&auto=format&fit=crop"
+        clean.contains("push-up") || clean.contains("plank") -> 
+            "https://images.unsplash.com/photo-1598971639058-fab3c3109a00?q=80&w=500&auto=format&fit=crop"
+        clean.contains("deadlift") -> 
+            "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=500&auto=format&fit=crop"
+        clean.contains("pull") || clean.contains("row") -> 
+            "https://images.unsplash.com/photo-1605296867304-46d5465a25f1?q=80&w=500&auto=format&fit=crop"
+        clean.contains("press") -> 
+            "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=300&auto=format&fit=crop"
+        clean.contains("stretch") || clean.contains("pose") -> 
+            "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=500&auto=format&fit=crop"
+        category.equals("Cardio", ignoreCase = true) -> 
+            "https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=500&auto=format&fit=crop"
+        category.equals("Stretching", ignoreCase = true) -> 
+            "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=500&auto=format&fit=crop"
+        else -> 
+            "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=500&auto=format&fit=crop"
+    }
+}
+
